@@ -9,7 +9,7 @@ import com.yaconfig.commands.PutCommand;
 
 public class YAConfig{
 
-	protected static final long HEARTBEAT_INTVAL = 2000;
+	protected static final long HEARTBEAT_INTVAL = 2000; //ms
 
 	private static EndPointSet eps;
 	
@@ -37,7 +37,7 @@ public class YAConfig{
 	
 	public static void init(int port) throws Exception {
 		
-		SERVER_ID = String.valueOf(System.currentTimeMillis());
+		SERVER_ID = String.valueOf(port);
 		
 		IS_MASTER = false;
 		
@@ -45,9 +45,10 @@ public class YAConfig{
 		quorums = 3;
         
 		eps = new EndPointSet();
-		eps.add(new EndPoint("0","127.0.0.1:4242"));
-		eps.add(new EndPoint("1","127.0.0.1:4243"));
-		eps.add(new EndPoint("2","127.0.0.1:4244"));
+		eps.add(new EndPoint("4241","127.0.0.1:4241"));
+		eps.add(new EndPoint("4242","127.0.0.1:4242"));
+		eps.add(new EndPoint("4243","127.0.0.1:4243"));
+		//eps.add(new EndPoint("4244","127.0.0.1:4244"));
 		
 		Watcher epWatcher = new Watcher("com.yaconfig.node..*");
 		epWatcher.setChangeListener(new IChangeListener(){
@@ -58,7 +59,6 @@ public class YAConfig{
 				
 				switch (suffix) {
 				case "status":
-					System.out.println("heartbeat:" + key);
 				    getEps().setEPStatus(key,new String(value));
 				    break;
 				case "vote":
@@ -74,7 +74,8 @@ public class YAConfig{
 
 			@Override
 			public void onChange(String key, byte[] value) {
-				getEps().setCurrentMaster(String.valueOf(value));
+				String masterId = new String(value);
+				getEps().setCurrentMaster(masterId);
 			}
 			
 		});
@@ -89,10 +90,7 @@ public class YAConfig{
 			@Override
 			public void run(){
 				for(;;){
-			        PutCommand put = new PutCommand("put");
-			        put.setExecutor(exec);
-			        put.execute(("com.yaconfig.node." + SERVER_ID + ".status"),
-			        		STATUS.toString().getBytes());
+			        reportStatus();
 			        try {
 						Thread.sleep(HEARTBEAT_INTVAL);
 					} catch (InterruptedException e) {
@@ -110,7 +108,7 @@ public class YAConfig{
 			@Override
 			public void callback(){
 				heartbeat.start();
-				getEps().startElection();
+				getEps().startMasterListening();
 			}
 		});
 		put.execute(("com.yaconfig.node." + SERVER_ID),HOST.getBytes());
@@ -137,7 +135,7 @@ public class YAConfig{
 		
 		
 		serverThread.start();
-		Thread.sleep(5000);
+		Thread.sleep(2000);
 		clientThread.start();
 	}
 
@@ -153,7 +151,7 @@ public class YAConfig{
         PutCommand changeStatus = new PutCommand("put");
         changeStatus.setExecutor(YAConfig.exec);
         changeStatus.execute(("com.yaconfig.node." + YAConfig.SERVER_ID + ".status"),
-        		YAConfig.STATUS.toString().getBytes());	
+        		YAConfig.STATUS.toString().getBytes());
 	}
 
 	public static EndPointSet getEps() {
@@ -164,19 +162,23 @@ public class YAConfig{
 		YAConfig.eps = eps;
 	}
 
-	public static void broadcastToQuorums(String key, byte[] value) {
+	public static void broadcastToQuorums(YAMessage msg) {
 		if(server != null){
-			server.broadcastToQuorums(key,value);
+			server.broadcastToQuorums(msg);
 		}
 	}
 
-	public static void redirectToMaster(String key, byte[] value) {
-		//YAConfig.sendMessage(eps.currentMaster,key,value);
+	public static void redirectToMaster(YAMessage msg) {
+		YAConfig.sendMessage(eps.currentMaster,msg);
+	}
+
+	private static void sendMessage(EndPoint currentMaster, YAMessage msg) {
+		client.sendMessage(currentMaster,msg);
 	}
 
 	public static void processMessage(YAMessage yamsg) {
-		if(yamsg.type == YAMessage.Type.PUT_LOCAL){
-			PutCommand put = new PutCommand("put_local");
+		if(yamsg.type == YAMessage.Type.PUT){
+			PutCommand put = new PutCommand("put");
 			put.setExecutor(exec);
 			put.execute(yamsg);
 		}else if(yamsg.type == YAMessage.Type.GET){

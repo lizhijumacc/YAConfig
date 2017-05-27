@@ -11,7 +11,6 @@ public class YAMessage implements Serializable {
 	public enum Type{
 		PUT,
 		GET,
-		PUT_LOCAL,
 		GET_LOCAL,
 	}
 	

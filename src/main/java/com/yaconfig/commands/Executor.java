@@ -18,15 +18,12 @@ public class Executor implements Serializable{
 			if(YAConfig.STATUS == EndPoint.EndPointStatus.ELECTING
 					||YAConfig.STATUS == EndPoint.EndPointStatus.INIT
 					||YAConfig.STATUS == EndPoint.EndPointStatus.LEADING){
-				YAConfig.broadcastToQuorums(yaMessage.key,yaMessage.value);
+				YAConfig.broadcastToQuorums(yaMessage);
 			}else if(YAConfig.STATUS == EndPoint.EndPointStatus.FOLLOWING){
-				YAConfig.redirectToMaster(yaMessage.key,yaMessage.value);
+				YAConfig.redirectToMaster(yaMessage);
 			}else{
 				return;
 			}			
-		}else if(yaMessage.type == YAMessage.Type.PUT_LOCAL){
-			YAHashMap.getInstance().put(yaMessage.key,yaMessage.value);
-			YAConfig.notifyWatchers(yaMessage.key,yaMessage.value);
 		}
 		
 		if(callback != null){

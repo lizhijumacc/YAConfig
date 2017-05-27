@@ -98,20 +98,19 @@ public class YAConfigServer implements Runnable{
 				address.getHostName()+ ":" + String.valueOf(address.getPort()), c);
 	}
 	
-	public void broadcastToQuorums(String key, byte[] value) {
+	public void broadcastToQuorums(YAMessage msg) {
 		for(Entry<String,Channel> c :channels.entrySet()){
 			Channel channel = c.getValue();
 			
 			if(null != channel && channel.isActive()){
-				ChannelFuture f = channel.writeAndFlush(
-						new YAMessage(key,value,YAMessage.Type.PUT_LOCAL));
+				ChannelFuture f = channel.writeAndFlush(msg);
 				try {
+					//TODO: should not write in sync mode.
 					f.sync();
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-			}	
+			}
 		}
 	}
 	

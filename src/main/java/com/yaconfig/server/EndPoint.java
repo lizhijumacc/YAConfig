@@ -52,7 +52,7 @@ public class EndPoint {
 	
 	@Override
 	public int hashCode(){
-		return host().hashCode();
+		return (host() + this.serverId).hashCode();
 	}
 	
 	@Override
@@ -64,7 +64,8 @@ public class EndPoint {
 			return true;
 		}
 		return this.ip.equals(((EndPoint)other).getIp()) 
-				&& this.port.equals(((EndPoint)other).getPort()); 
+				&& this.port.equals(((EndPoint)other).getPort())
+				&& this.serverId.equals(((EndPoint)other).getServerId()); 
 	}
 
 	public String host() {

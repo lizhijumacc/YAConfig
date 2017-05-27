@@ -20,8 +20,7 @@ public class YAConfigServerHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		System.out.println(msg.toString());
-		ctx.write(msg);
+		server.processMessage((YAMessage)msg);
 	}
 	
 	@Override
@@ -31,14 +30,12 @@ public class YAConfigServerHandler extends ChannelInboundHandlerAdapter {
 
 	@Override
 	public void channelActive(ChannelHandlerContext ctx){
-		System.out.println("server active!");
 		server.addChannel(ctx.channel());
 	}
 	
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception{
 		super.channelInactive(ctx);
-		System.out.println("server inactive!");
 		server.removeChannel(ctx.channel());
 	}
 	

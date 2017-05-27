@@ -19,7 +19,6 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelActive(ChannelHandlerContext ctx){
-		System.out.println("client active!");
 		client.addChannel(ctx.channel());
 	}
 	
@@ -46,7 +45,6 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		super.channelInactive(ctx);
-		System.out.println("client inactive!");
 		reconnect(ctx);
 	}
 

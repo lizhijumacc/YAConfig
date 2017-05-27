@@ -7,6 +7,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.yaconfig.storage.YAHashMap;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -35,6 +37,8 @@ public class YAConfigClient implements Runnable{
 	
 	public YAConfigClient(){
 		loop = new NioEventLoopGroup();
+		//the number of endpoint is countable,use BIO read the 
+		//quorums messages.
 		connectService = Executors.newFixedThreadPool(YAConfig.quorums);
 		channels = new ConcurrentHashMap<String,Channel>();
 		rcvQueue = new YAMessageQueue();
@@ -109,13 +113,11 @@ public class YAConfigClient implements Runnable{
 		@Override
 		public void operationComplete(ChannelFuture future) throws Exception {
 			if(!future.isSuccess()){
-				System.out.println("connect error " + ip + ":" + port);
 				future.channel().eventLoop().schedule(new Runnable(){
 
 					@Override
 					public void run() {
 						client.connect(ip,port);
-						System.out.println("reconnect:" + ip + ":" + port);
 					}
 					
 				}, 3, TimeUnit.SECONDS);
@@ -138,6 +140,26 @@ public class YAConfigClient implements Runnable{
 	}
 
 	public void processMessage(YAMessage yamsg) {
-		YAConfig.processMessage(yamsg);
+		if(null == yamsg){
+			return;
+		}
+		YAHashMap.getInstance().put(yamsg.key, yamsg.value);
+		YAConfig.notifyWatchers(yamsg.key, yamsg.value);
+	}
+
+	public void sendMessage(EndPoint currentMaster, YAMessage msg) {
+		for(Entry<String,Channel> ep: channels.entrySet()){
+			Channel channel = ep.getValue();
+			InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
+			if(address.getHostName().equals(currentMaster.getIp())
+					&& currentMaster.getPort().equals(String.valueOf(address.getPort()))){
+				try {
+					//TODO should not write in sync mode
+					channel.writeAndFlush(msg).sync();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
 	}
 }
