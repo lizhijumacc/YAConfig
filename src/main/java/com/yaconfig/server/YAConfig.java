@@ -45,9 +45,9 @@ public class YAConfig{
 		quorums = 3;
         
 		eps = new EndPointSet();
-		eps.add(new EndPoint("4241","127.0.0.1:4241"));
-		eps.add(new EndPoint("4242","127.0.0.1:4242"));
-		eps.add(new EndPoint("4243","127.0.0.1:4243"));
+		eps.add(new EndPoint("4247","127.0.0.1:4247"));
+		eps.add(new EndPoint("4248","127.0.0.1:4248"));
+		eps.add(new EndPoint("4249","127.0.0.1:4249"));
 		//eps.add(new EndPoint("4244","127.0.0.1:4244"));
 		
 		Watcher epWatcher = new Watcher("com.yaconfig.node..*");
@@ -86,7 +86,7 @@ public class YAConfig{
 					+ String.valueOf(port);
         
         //start heartbeat
-        heartbeat = new Thread(){
+        heartbeat = new Thread("heartbeatThread"){
 			@Override
 			public void run(){
 				for(;;){
@@ -103,18 +103,10 @@ public class YAConfig{
 		//register self
         PutCommand put = new PutCommand("put");
         put.setExecutor(exec);
-		put.setCallback(new PutCallback(){
-			
-			@Override
-			public void callback(){
-				heartbeat.start();
-				getEps().startMasterListening();
-			}
-		});
 		put.execute(("com.yaconfig.node." + SERVER_ID),HOST.getBytes());
 	
 		client = new YAConfigClient();
-		Thread clientThread = new Thread(){
+		Thread clientThread = new Thread("clientThread"){
 			@Override
 			public void run(){
 				client.run();
@@ -122,7 +114,7 @@ public class YAConfig{
 		};
 		
 		server = new YAConfigServer(port);
-		Thread serverThread = new Thread(){
+		Thread serverThread = new Thread("serverThread"){
 			@Override
 			public void run(){
 				try {
@@ -137,6 +129,9 @@ public class YAConfig{
 		serverThread.start();
 		Thread.sleep(2000);
 		clientThread.start();
+		Thread.sleep(1000);
+        heartbeat.start();
+        getEps().startMasterListening();
 	}
 
 	public Watchers getWatcherSet() {
@@ -169,11 +164,7 @@ public class YAConfig{
 	}
 
 	public static void redirectToMaster(YAMessage msg) {
-		YAConfig.sendMessage(eps.currentMaster,msg);
-	}
-
-	private static void sendMessage(EndPoint currentMaster, YAMessage msg) {
-		client.sendMessage(currentMaster,msg);
+		client.redirectToMaster(msg);
 	}
 
 	public static void processMessage(YAMessage yamsg) {
@@ -192,7 +183,7 @@ public class YAConfig{
         if (args.length > 0){
         	port = Integer.parseInt(args[0]);
         }else{
-        	port = 4242;
+        	port = 4241;
         }
         
         YAConfig.init(port);

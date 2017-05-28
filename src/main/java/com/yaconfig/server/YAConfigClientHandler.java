@@ -26,7 +26,9 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 	public void channelRead(ChannelHandlerContext ctx, Object msg) {
 		YAMessage yamsg = (YAMessage)msg;
 		try {
+			System.out.println("client rcv a massge:" + yamsg.toString());
 			client.rcvQueue.push(yamsg);
+			//ctx.flush();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

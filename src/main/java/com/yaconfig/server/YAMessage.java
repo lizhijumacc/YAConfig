@@ -7,6 +7,7 @@ public class YAMessage implements Serializable {
 	public String key;
 	public byte[] value;
 	public Type type;
+	public long timestamp;
 	
 	public enum Type{
 		PUT,
@@ -18,5 +19,10 @@ public class YAMessage implements Serializable {
 		this.key = key;
 		this.value = value;
 		this.type = type;
+		timestamp = System.currentTimeMillis();
+	}
+	
+	public String toString(){
+		return this.key + ": " + new String(this.value) + ": " + (this.timestamp/1000) % 100;
 	}
 }

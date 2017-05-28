@@ -20,7 +20,9 @@ public class YAConfigServerHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-		server.processMessage((YAMessage)msg);
+		YAMessage yamsg = (YAMessage)msg;
+		System.out.println("server rcv a massge:" + yamsg.toString());
+		server.processMessage(yamsg);
 	}
 	
 	@Override

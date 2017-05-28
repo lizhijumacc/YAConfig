@@ -12,6 +12,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
@@ -25,16 +27,49 @@ public class YAConfigServer implements Runnable{
 	
 	ConcurrentHashMap<String,Channel> channels;
 	
-	YAMessageQueue msgQueue;
+	YAMessageQueue boardcastQueue;
+	
+	Thread boardcastThread;
 	
 	public YAConfigServer(int port){
 		this.port = port;
 		channels = new ConcurrentHashMap<String,Channel>();
-		msgQueue = new YAMessageQueue();
+		boardcastQueue = new YAMessageQueue();
 	}
 	
 	@Override
 	public void run(){
+		boardcastThread = new Thread("boardcastThread"){
+			@Override
+			public void run(){
+				while(true){
+					YAMessage yamsg = null;
+					try {
+						yamsg = boardcastQueue.take();
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					
+					for(Entry<String,Channel> c :channels.entrySet()){
+						Channel channel = c.getValue();
+						if(null != channel && channel.isActive()
+								&& yamsg != null){
+							System.out.println("boardcast:" + yamsg.toString());
+							channel.writeAndFlush(yamsg);
+						}
+					}
+					try {
+						Thread.sleep(10);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+			}
+		};
+		
+		boardcastThread.start();
+		
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
 		try{
@@ -47,14 +82,16 @@ public class YAConfigServer implements Runnable{
 				@Override
 				protected void initChannel(SocketChannel ch) throws Exception {
 					ch.pipeline().addLast(
+							//new LengthFieldPrepender(2),
 							new ObjectEncoder(),
+							//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 							new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
 			    			new YAConfigServerHandler(YAConfig.server)
 			    			);
 				}
 				 
 			 })
-			 .option(ChannelOption.SO_BACKLOG, 511)
+			 .option(ChannelOption.SO_BACKLOG, 128)
 			 .option(ChannelOption.SO_REUSEADDR, true)
 			 .childOption(ChannelOption.SO_KEEPALIVE, true)
 			 .childOption(ChannelOption.TCP_NODELAY, true)
@@ -99,18 +136,11 @@ public class YAConfigServer implements Runnable{
 	}
 	
 	public void broadcastToQuorums(YAMessage msg) {
-		for(Entry<String,Channel> c :channels.entrySet()){
-			Channel channel = c.getValue();
-			
-			if(null != channel && channel.isActive()){
-				ChannelFuture f = channel.writeAndFlush(msg);
-				try {
-					//TODO: should not write in sync mode.
-					f.sync();
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
+		try {
+			boardcastQueue.push(msg);
+		} catch (InterruptedException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
 		}
 	}
 	

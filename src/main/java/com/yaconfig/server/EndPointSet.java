@@ -41,14 +41,23 @@ public class EndPointSet {
 	//only add from config file.
 	public void add(EndPoint e){
 		if(!eps.contains(e)){
+			e.heartbeatTimestamp = System.currentTimeMillis();
 			eps.put(e.getServerId(), e);
 		}
 	}
 
 	public void setEPStatus(String key, String status) {
 		EndPoint ep = eps.get(getServerIdFromKey(key));
+		
 		if(null != ep){
+			EndPoint.EndPointStatus preStatus = ep.status;
 			ep.status = EndPoint.EndPointStatus.valueOf(status);
+			if(preStatus != ep.status){
+				System.out.println("-------STATUS CHANGE---------");
+				System.out.println(ep.getServerId() + " /preStatus:" + preStatus + 
+					"  /currentStatus:" + ep.status);
+				System.out.println("-----------------------------");
+			}
 			ep.heartbeatTimestamp = System.currentTimeMillis();
 		}
 	}
@@ -59,7 +68,7 @@ public class EndPointSet {
 	}
 
 	public void startMasterListening() {
-		masterListeningThread = new Thread(){
+		masterListeningThread = new Thread("masterListeningThread"){
 			@Override
 			public void run(){
 				
@@ -75,12 +84,20 @@ public class EndPointSet {
 								if(needElectMaster()){
 									YAConfig.STATUS = EndPoint.EndPointStatus.ELECTING;
 									voteNextMaster();
+								}else if(YAConfig.STATUS != EndPoint.EndPointStatus.LEADING){
+									YAConfig.STATUS = EndPoint.EndPointStatus.FOLLOWING;
 								}
 								
 								//if master's heartbeat is timeout
 								if(System.currentTimeMillis() - ep.heartbeatTimestamp 
-										> 2 * YAConfig.HEARTBEAT_INTVAL){
+										> 2 * YAConfig.HEARTBEAT_INTVAL
+										&& ep.status != EndPoint.EndPointStatus.DEAD){
 									ep.status = EndPoint.EndPointStatus.DEAD;
+									System.out.println("-------CHECK EP DEAD---------");
+									System.out.println(ep.getPort() + " dead!");
+									System.out.println(System.currentTimeMillis());
+									System.out.println(ep.heartbeatTimestamp);
+									System.out.println("-----------------------------");
 									if(ep.equals(currentMaster)){
 										electing = true;
 									}
@@ -95,12 +112,11 @@ public class EndPointSet {
 							}
 						}else if(YAConfig.STATUS == EndPoint.EndPointStatus.LEADING){
 							YAConfig.STATUS = EndPoint.EndPointStatus.ELECTING;
-							YAConfig.reportStatus();
 						}
 					}
 					
 					try {
-						Thread.sleep(200);
+						Thread.sleep(4000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -122,7 +138,7 @@ public class EndPointSet {
 		};
 		
 		
-		masterElectingThread = new Thread(){
+		masterElectingThread = new Thread("masterElectingThread"){
 			@Override 
 			public void run(){
 				while(true){
@@ -136,14 +152,14 @@ public class EndPointSet {
 			}
 		};
 		
-		countVotesThread = new Thread(){
+		countVotesThread = new Thread("countVotesThread"){
 			@Override
 			public void run(){
 				while(true){
 					try {
 						while(counting){
 							countVotes();
-							Thread.sleep(200);
+							Thread.sleep(2000);
 						}
 					} catch (InterruptedException e) {
 						e.printStackTrace();
@@ -210,7 +226,6 @@ public class EndPointSet {
 					&& currentMaster.status == EndPoint.EndPointStatus.LEADING
 					&& !YAConfig.IS_MASTER){
 				YAConfig.STATUS = EndPoint.EndPointStatus.FOLLOWING;
-				YAConfig.reportStatus();
 				electing = false;
 			}
 			
@@ -222,7 +237,7 @@ public class EndPointSet {
 			}
 			
 			try {
-				Thread.sleep(100);
+				Thread.sleep(2000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -232,13 +247,17 @@ public class EndPointSet {
 
 	private void voteNextMaster() {
 		nextMaster = getNextMaster();
+		
 		if(nextMaster != null){
+			System.out.println("I vote to:" + nextMaster.getServerId());
 	        PutCommand voteNextMaster = new PutCommand("put");
 	        voteNextMaster.setExecutor(YAConfig.exec);
 	        voteNextMaster.execute(("com.yaconfig.node." + YAConfig.SERVER_ID + ".vote"),
 	        		nextMaster.getServerId().getBytes());
+	        counting = true;
+		}else{
+			System.out.println("I vote to: null!!!!!!!!!!!");
 		}
-		counting = true;
 	}
 
 	private void countVotes() {
@@ -278,7 +297,6 @@ public class EndPointSet {
 	        setMaster.execute("com.yaconfig.master",YAConfig.SERVER_ID.getBytes());
 			YAConfig.IS_MASTER = true;
 			YAConfig.STATUS = EndPoint.EndPointStatus.LEADING;
-			YAConfig.reportStatus();
 		}
 	}
 
@@ -317,10 +335,11 @@ public class EndPointSet {
 			for(;;){
 				if(YAConfig.getEps().isLeading(masterId)){
 					YAConfig.getEps().currentMaster = eps.get(masterId);
-					System.out.println("the king is!!!!:" + masterId);
+					System.out.println("-----------MASTER CHANGE-----------");
+					System.out.println("curren master is:" + masterId);
+					System.out.println("-----------------------------------");
 					if(!masterId.equals(YAConfig.SERVER_ID)){
 						YAConfig.STATUS = EndPoint.EndPointStatus.FOLLOWING;
-						YAConfig.reportStatus();
 					}
 
 					electing = false;
@@ -334,6 +353,7 @@ public class EndPointSet {
 	}
 	
 	public void setCurrentMaster(String masterId) {
+		System.out.println("master id:" + masterId);
 		//waiting for current master begin to lead.
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		Future<Boolean> future = executor.submit(new WatingMasterLeading(masterId));

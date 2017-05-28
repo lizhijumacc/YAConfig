@@ -20,6 +20,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
@@ -34,6 +36,9 @@ public class YAConfigClient implements Runnable{
 	
 	YAMessageQueue rcvQueue;
 	
+	YAMessageQueue sendToMasterQueue;
+	
+	Thread sendToMasterThread;
 	
 	public YAConfigClient(){
 		loop = new NioEventLoopGroup();
@@ -42,6 +47,49 @@ public class YAConfigClient implements Runnable{
 		connectService = Executors.newFixedThreadPool(YAConfig.quorums);
 		channels = new ConcurrentHashMap<String,Channel>();
 		rcvQueue = new YAMessageQueue();
+		sendToMasterQueue = new YAMessageQueue();
+		
+		sendToMasterThread = new Thread("sendToMasterThread"){
+			@Override
+			public void run(){
+				while(true){
+					
+					YAMessage yamsg = null;
+					try {
+						
+						yamsg = sendToMasterQueue.take();
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					
+					EndPoint currentMaster = YAConfig.getEps().currentMaster;
+					if(currentMaster != null && yamsg != null){
+						for(Entry<String,Channel> ep: channels.entrySet()){
+							Channel channel = ep.getValue();
+							if(channel.isActive()){
+								InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
+								if(address.getHostName().equals(currentMaster.getIp())
+										&& currentMaster.getPort().equals(String.valueOf(address.getPort()))){
+									try {
+										System.out.println("send to master:" + yamsg.toString());
+										channel.writeAndFlush(yamsg).sync();
+									} catch (InterruptedException e) {
+										e.printStackTrace();
+									}
+								}
+							}
+						}
+					}
+					try {
+						Thread.sleep(10);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		};
+		
+		sendToMasterThread.start();
 	}
 	
 	public void connect(String ip,int port){
@@ -56,11 +104,14 @@ public class YAConfigClient implements Runnable{
 				 public void initChannel(SocketChannel ch) throws Exception {
 					 ChannelPipeline p = ch.pipeline();
 					 p.addLast(
+							//new LengthFieldPrepender(2),
 						 	new ObjectEncoder(),
+						 	//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 						 	new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
 						 	new YAConfigClientHandler(YAConfig.client));
 			 	 }
-			 }).option(ChannelOption.SO_KEEPALIVE,true);
+			 }).option(ChannelOption.SO_KEEPALIVE,true)
+			   .option(ChannelOption.TCP_NODELAY,true);
 			bootstrap.connect(ip,port).awaitUninterruptibly()
 			.addListener(new ConnectionListener(this,ip,port));
 			
@@ -120,9 +171,9 @@ public class YAConfigClient implements Runnable{
 						client.connect(ip,port);
 					}
 					
-				}, 3, TimeUnit.SECONDS);
+				}, 4, TimeUnit.SECONDS);
 			}else{
-				System.out.println("connect success " + ip + ":" + port);
+				System.out.println("------------------------connect success " + ip + ":" + port);
 			}
 		}
 		
@@ -147,19 +198,11 @@ public class YAConfigClient implements Runnable{
 		YAConfig.notifyWatchers(yamsg.key, yamsg.value);
 	}
 
-	public void sendMessage(EndPoint currentMaster, YAMessage msg) {
-		for(Entry<String,Channel> ep: channels.entrySet()){
-			Channel channel = ep.getValue();
-			InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
-			if(address.getHostName().equals(currentMaster.getIp())
-					&& currentMaster.getPort().equals(String.valueOf(address.getPort()))){
-				try {
-					//TODO should not write in sync mode
-					channel.writeAndFlush(msg).sync();
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
+	public void redirectToMaster(YAMessage msg) {
+		try {
+			sendToMasterQueue.push(msg);
+		} catch (InterruptedException e1) {
+			e1.printStackTrace();
 		}
 	}
 }
