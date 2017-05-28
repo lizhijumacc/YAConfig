@@ -20,8 +20,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
@@ -32,6 +30,8 @@ public class YAConfigClient implements Runnable{
 	
 	private ExecutorService connectService;
 	
+	private ExecutorService processMsgService;
+	
 	private ConcurrentHashMap<String,Channel> channels;
 	
 	YAMessageQueue rcvQueue;
@@ -39,6 +39,8 @@ public class YAConfigClient implements Runnable{
 	YAMessageQueue sendToMasterQueue;
 	
 	Thread sendToMasterThread;
+	
+	Thread clientRcvMessageThread;
 	
 	public YAConfigClient(){
 		loop = new NioEventLoopGroup();
@@ -48,6 +50,73 @@ public class YAConfigClient implements Runnable{
 		channels = new ConcurrentHashMap<String,Channel>();
 		rcvQueue = new YAMessageQueue();
 		sendToMasterQueue = new YAMessageQueue();
+		processMsgService = Executors.newFixedThreadPool(YAConfig.quorums);
+	}
+	
+	public void connect(final String ip,final int port){
+		
+		Bootstrap bootstrap = new Bootstrap();
+		
+		try{
+			bootstrap.group(loop)
+			 .channel(NioSocketChannel.class)
+			 .handler(new ChannelInitializer<SocketChannel>() {
+				 @Override
+				 public void initChannel(SocketChannel ch) throws Exception {
+					 ChannelPipeline p = ch.pipeline();
+					 p.addLast(
+							//new LengthFieldPrepender(2),
+						 	new ObjectEncoder(),
+						 	//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
+						 	new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
+						 	new YAConfigClientHandler(YAConfig.client));
+			 	 }
+			 }).option(ChannelOption.SO_KEEPALIVE,true)
+			   .option(ChannelOption.TCP_NODELAY,true);
+			bootstrap.connect(ip,port).awaitUninterruptibly()
+			.addListener(new ConnectionListener(this,ip,port));
+			
+			while(true){
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}finally{
+			loop.shutdownGracefully();
+		}	
+	}
+
+	@Override
+	public void run() {
+		for(Entry<String,EndPoint> e: YAConfig.getEps().eps.entrySet()){
+			EndPoint ep = e.getValue();
+			final String ip = ep.getIp();
+			final int port = Integer.parseInt(ep.getPort());
+			connectService.execute(new Runnable(){
+
+				@Override
+				public void run() {
+					connect(ip,port);
+				}
+				
+			});
+		}
+		
+		processMsgService.execute(new Runnable(){
+			@Override
+			public void run(){
+				while(true){
+					try {
+						YAMessage yamsg = rcvQueue.take();
+						processMessage(yamsg);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		});
 		
 		sendToMasterThread = new Thread("sendToMasterThread"){
 			@Override
@@ -91,61 +160,6 @@ public class YAConfigClient implements Runnable{
 		
 		sendToMasterThread.start();
 	}
-	
-	public void connect(String ip,int port){
-		
-		Bootstrap bootstrap = new Bootstrap();
-		
-		try{
-			bootstrap.group(loop)
-			 .channel(NioSocketChannel.class)
-			 .handler(new ChannelInitializer<SocketChannel>() {
-				 @Override
-				 public void initChannel(SocketChannel ch) throws Exception {
-					 ChannelPipeline p = ch.pipeline();
-					 p.addLast(
-							//new LengthFieldPrepender(2),
-						 	new ObjectEncoder(),
-						 	//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
-						 	new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-						 	new YAConfigClientHandler(YAConfig.client));
-			 	 }
-			 }).option(ChannelOption.SO_KEEPALIVE,true)
-			   .option(ChannelOption.TCP_NODELAY,true);
-			bootstrap.connect(ip,port).awaitUninterruptibly()
-			.addListener(new ConnectionListener(this,ip,port));
-			
-			//start messge recv loop
-			while(true){
-				try {
-					YAMessage msg = rcvQueue.take();
-					processMessage(msg);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
-			
-		}finally{
-			loop.shutdownGracefully();
-		}	
-	}
-
-	@Override
-	public void run() {
-		for(Entry<String,EndPoint> e: YAConfig.getEps().eps.entrySet()){
-			EndPoint ep = e.getValue();
-			final String ip = ep.getIp();
-			final int port = Integer.parseInt(ep.getPort());
-			connectService.execute(new Runnable(){
-
-				@Override
-				public void run() {
-					connect(ip,port);
-				}
-				
-			});
-		}
-	}
 
 	public class ConnectionListener implements ChannelFutureListener {
 
@@ -168,12 +182,13 @@ public class YAConfigClient implements Runnable{
 
 					@Override
 					public void run() {
+						YAConfig.printImportant("RECONNECT","reconnect " + ip + ":" + port);
 						client.connect(ip,port);
 					}
 					
 				}, 4, TimeUnit.SECONDS);
 			}else{
-				System.out.println("------------------------connect success " + ip + ":" + port);
+				YAConfig.printImportant("CONNECT SUCCESS", "connect success " + ip + ":" + port);
 			}
 		}
 		

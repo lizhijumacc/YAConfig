@@ -53,10 +53,8 @@ public class EndPointSet {
 			EndPoint.EndPointStatus preStatus = ep.status;
 			ep.status = EndPoint.EndPointStatus.valueOf(status);
 			if(preStatus != ep.status){
-				System.out.println("-------STATUS CHANGE---------");
-				System.out.println(ep.getServerId() + " /preStatus:" + preStatus + 
+				YAConfig.printImportant("STATUS CHANGE", ep.getServerId() + " /preStatus:" + preStatus + 
 					"  /currentStatus:" + ep.status);
-				System.out.println("-----------------------------");
 			}
 			ep.heartbeatTimestamp = System.currentTimeMillis();
 		}
@@ -93,11 +91,7 @@ public class EndPointSet {
 										> 2 * YAConfig.HEARTBEAT_INTVAL
 										&& ep.status != EndPoint.EndPointStatus.DEAD){
 									ep.status = EndPoint.EndPointStatus.DEAD;
-									System.out.println("-------CHECK EP DEAD---------");
-									System.out.println(ep.getPort() + " dead!");
-									System.out.println(System.currentTimeMillis());
-									System.out.println(ep.heartbeatTimestamp);
-									System.out.println("-----------------------------");
+									YAConfig.printImportant("CHECK EP DEAD", ep.getPort() + " dead!");
 									if(ep.equals(currentMaster)){
 										electing = true;
 									}
