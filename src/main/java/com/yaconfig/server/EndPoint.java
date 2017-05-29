@@ -25,7 +25,7 @@ public class EndPoint {
 		UNKOWN;
 	}
 	
-	public EndPointStatus status = EndPointStatus.UNKOWN;
+	public volatile EndPointStatus status = EndPointStatus.UNKOWN;
 	
 	public EndPoint(String serverId,String host){
 		String[] sp = host.split(":");

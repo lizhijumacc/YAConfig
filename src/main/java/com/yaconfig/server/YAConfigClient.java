@@ -57,24 +57,23 @@ public class YAConfigClient implements Runnable{
 		
 		Bootstrap bootstrap = new Bootstrap();
 		
-		
-			bootstrap.group(loop)
-			 .channel(NioSocketChannel.class)
-			 .handler(new ChannelInitializer<SocketChannel>() {
-				 @Override
-				 public void initChannel(SocketChannel ch) throws Exception {
-					 ChannelPipeline p = ch.pipeline();
-					 p.addLast(
-							//new LengthFieldPrepender(2),
-						 	new ObjectEncoder(),
-						 	//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
-						 	new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-						 	new YAConfigClientHandler(YAConfig.client));
-			 	 }
-			 }).option(ChannelOption.SO_KEEPALIVE,true)
-			   .option(ChannelOption.TCP_NODELAY,true);
-			ChannelFuture f = bootstrap.connect(ip,port).awaitUninterruptibly()
-			.addListener(new ConnectionListener(this,ip,port));		
+		bootstrap.group(loop)
+			.channel(NioSocketChannel.class)
+			.handler(new ChannelInitializer<SocketChannel>() {
+				@Override
+				public void initChannel(SocketChannel ch) throws Exception {
+					ChannelPipeline p = ch.pipeline();
+					p.addLast(
+						//new LengthFieldPrepender(2),
+						 new ObjectEncoder(),
+						 //new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
+						 new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
+						 new YAConfigClientHandler(YAConfig.client));
+			 	}
+			}).option(ChannelOption.SO_KEEPALIVE,true)
+			  .option(ChannelOption.TCP_NODELAY,true);
+		bootstrap.connect(ip,port).awaitUninterruptibly()
+				.addListener(new ConnectionListener(this,ip,port));		
 	}
 
 	@Override

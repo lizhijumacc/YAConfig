@@ -3,6 +3,7 @@ package com.yaconfig.server;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -84,6 +85,9 @@ public class EndPointSet {
 									voteNextMaster();
 								}else if(YAConfig.STATUS != EndPoint.EndPointStatus.LEADING){
 									YAConfig.STATUS = EndPoint.EndPointStatus.FOLLOWING;
+									if(currentMaster == null){
+										setMasterLocal();
+									}
 								}
 								
 								//if master's heartbeat is timeout
@@ -110,7 +114,7 @@ public class EndPointSet {
 					}
 					
 					try {
-						Thread.sleep(4000);
+						Thread.sleep(2000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -177,6 +181,15 @@ public class EndPointSet {
 			countVotesThread.start();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
+		}
+	}
+
+	public void setMasterLocal() {
+		for(Entry<String,EndPoint> e : eps.entrySet()){
+			EndPoint ep = e.getValue();
+			if(ep.status == EndPoint.EndPointStatus.LEADING){
+				currentMaster = ep;
+			}
 		}
 	}
 
@@ -285,7 +298,7 @@ public class EndPointSet {
 	}
 
 	private void setMaster(String serverId) {
-		if(serverId.equals(YAConfig.SERVER_ID)){
+		if(serverId.equals(YAConfig.SERVER_ID) && YAConfig.STATUS != EndPoint.EndPointStatus.LEADING){
 	        PutCommand setMaster = new PutCommand("put");
 	        setMaster.setExecutor(YAConfig.exec);
 	        setMaster.execute("com.yaconfig.master",YAConfig.SERVER_ID.getBytes());
@@ -328,7 +341,7 @@ public class EndPointSet {
 		public Boolean call() {
 			for(;;){
 				if(YAConfig.getEps().isLeading(masterId)){
-					YAConfig.getEps().currentMaster = eps.get(masterId);
+					YAConfig.getEps().setMasterLocal();
 					System.out.println("-----------MASTER CHANGE-----------");
 					System.out.println("curren master is:" + masterId);
 					System.out.println("-----------------------------------");
@@ -373,7 +386,7 @@ public class EndPointSet {
 	}
 
 	private boolean isLeading(String masterId) {
-		if(masterId != null && eps.get(masterId) != null){
+		if(masterId != null && eps.get(masterId) != null && !needElectMaster()){
 			return eps.get(masterId).status == EndPoint.EndPointStatus.LEADING;
 		}
 		return false;
