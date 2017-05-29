@@ -37,7 +37,6 @@ public class YAConfigServerHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception{
-		super.channelInactive(ctx);
 		server.removeChannel(ctx.channel());
 	}
 	

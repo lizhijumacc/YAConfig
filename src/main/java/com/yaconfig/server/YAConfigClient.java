@@ -113,26 +113,29 @@ public class YAConfigClient implements Runnable{
 					
 					YAMessage yamsg = null;
 					try {
-						
 						yamsg = sendToMasterQueue.take();
 					} catch (InterruptedException e1) {
 						e1.printStackTrace();
 					}
 					
 					EndPoint currentMaster = YAConfig.getEps().currentMaster;
+					
 					if(currentMaster != null && yamsg != null){
 						for(Entry<String,Channel> ep: channels.entrySet()){
 							Channel channel = ep.getValue();
-							if(channel.isActive()){
-								InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
-								if(address.getHostName().equals(currentMaster.getIp())
-										&& currentMaster.getPort().equals(String.valueOf(address.getPort()))){
+
+							InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
+							if(address.getHostName().equals(currentMaster.getIp())
+									&& currentMaster.getPort().equals(String.valueOf(address.getPort()))){
+								if(channel.isActive()){
 									try {
-										//System.out.println("send to master:" + yamsg.toString());
+										System.out.println("send to master:" + yamsg.toString());
 										channel.writeAndFlush(yamsg).sync();
 									} catch (InterruptedException e) {
 										e.printStackTrace();
-									}
+									}			
+								}else{
+									System.out.println("Current Master Channel is not Active now!" + currentMaster.getServerId());
 								}
 							}
 						}
@@ -206,5 +209,10 @@ public class YAConfigClient implements Runnable{
 		} catch (InterruptedException e1) {
 			e1.printStackTrace();
 		}
+	}
+
+	public void removeChannel(Channel channel) {
+		InetSocketAddress address = (InetSocketAddress)channel.remoteAddress();
+		channels.remove(address.getHostName() + ":" + String.valueOf(address.getPort()));
 	}
 }

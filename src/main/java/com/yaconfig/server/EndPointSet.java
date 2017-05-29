@@ -111,7 +111,7 @@ public class EndPointSet {
 	public void setEPStatus(String key, String status) {
 		EndPoint ep = eps.get(getServerIdFromKey(key));
 		
-		if(null != ep && ep.getServerId() != YAConfig.SERVER_ID){
+		if(null != ep){
 			EndPoint.EndPointStatus preStatus = ep.status;
 			ep.status = EndPoint.EndPointStatus.valueOf(status);
 			if(preStatus != ep.status){
@@ -285,17 +285,10 @@ public class EndPointSet {
 	}
 	
 	public void setCurrentMaster(String masterId) {
-		if(YAConfig.getEps().isLeading(masterId)){
-			if(!needElectMaster()){
-				YAConfig.getEps().setMasterLocal();
-				YAConfig.printImportant("MASTER CHANGE", "curren master is:" + masterId);
-				if(!masterId.equals(YAConfig.SERVER_ID)){
-					YAConfig.changeStatus(EndPoint.EndPointStatus.FOLLOWING);
-				}
-			}else{
-				YAConfig.changeStatus(EndPoint.EndPointStatus.ELECTING);
-				voteNextMaster();
-			}
+		currentMaster = eps.get(masterId);
+		YAConfig.printImportant("MASTER CHANGE", "curren master is:" + masterId);
+		if(!masterId.equals(YAConfig.SERVER_ID)){
+			YAConfig.changeStatus(EndPoint.EndPointStatus.FOLLOWING);
 		}
 	}
 

@@ -46,7 +46,7 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		System.out.println("inactive + " + ctx.channel().remoteAddress().toString());
+		client.removeChannel(ctx.channel());
 		reconnect(ctx);
 	}
 
