@@ -6,6 +6,7 @@ import java.util.Iterator;
 import com.yaconfig.commands.Executor;
 import com.yaconfig.commands.PutCallback;
 import com.yaconfig.commands.PutCommand;
+import com.yaconfig.server.EndPoint.EndPointStatus;
 
 public class YAConfig{
 
@@ -131,7 +132,7 @@ public class YAConfig{
 		clientThread.start();
 		Thread.sleep(1000);
         heartbeat.start();
-        getEps().startMasterListening();
+        getEps().run();
 	}
 
 	public Watchers getWatcherSet() {
@@ -198,4 +199,9 @@ public class YAConfig{
     		System.out.println();
     	}
     }
+	
+	public static void changeStatus(EndPointStatus status) {
+		STATUS = status;
+		reportStatus();
+	}
 }

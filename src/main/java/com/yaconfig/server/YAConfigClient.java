@@ -128,7 +128,7 @@ public class YAConfigClient implements Runnable{
 								if(address.getHostName().equals(currentMaster.getIp())
 										&& currentMaster.getPort().equals(String.valueOf(address.getPort()))){
 									try {
-										System.out.println("send to master:" + yamsg.toString());
+										//System.out.println("send to master:" + yamsg.toString());
 										channel.writeAndFlush(yamsg).sync();
 									} catch (InterruptedException e) {
 										e.printStackTrace();
@@ -170,13 +170,12 @@ public class YAConfigClient implements Runnable{
 
 					@Override
 					public void run() {
-						YAConfig.printImportant("RECONNECT","reconnect " + ip + ":" + port);
 						client.connect(ip,port);
 					}
 					
 				}, 4, TimeUnit.SECONDS);
 			}else{
-				YAConfig.printImportant("CONNECT SUCCESS", "connect success " + ip + ":" + port);
+				//YAConfig.printImportant("CONNECT SUCCESS", "connect success " + ip + ":" + port);
 			}
 		}
 		

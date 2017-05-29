@@ -54,7 +54,6 @@ public class YAConfigServer implements Runnable{
 						Channel channel = c.getValue();
 						if(null != channel && channel.isActive()
 								&& yamsg != null){
-							System.out.println("boardcast:" + yamsg.toString());
 							channel.writeAndFlush(yamsg);
 						}
 					}
