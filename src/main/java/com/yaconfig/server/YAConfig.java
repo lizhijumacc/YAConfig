@@ -183,7 +183,7 @@ public class YAConfig{
         if (args.length > 0){
         	port = Integer.parseInt(args[0]);
         }else{
-        	port = 4247;
+        	port = 4248;
         }
         
         YAConfig.init(port);

@@ -57,7 +57,7 @@ public class YAConfigClient implements Runnable{
 		
 		Bootstrap bootstrap = new Bootstrap();
 		
-		try{
+		
 			bootstrap.group(loop)
 			 .channel(NioSocketChannel.class)
 			 .handler(new ChannelInitializer<SocketChannel>() {
@@ -73,19 +73,8 @@ public class YAConfigClient implements Runnable{
 			 	 }
 			 }).option(ChannelOption.SO_KEEPALIVE,true)
 			   .option(ChannelOption.TCP_NODELAY,true);
-			bootstrap.connect(ip,port).awaitUninterruptibly()
-			.addListener(new ConnectionListener(this,ip,port));
-			
-			while(true){
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
-		}finally{
-			loop.shutdownGracefully();
-		}	
+			ChannelFuture f = bootstrap.connect(ip,port).awaitUninterruptibly()
+			.addListener(new ConnectionListener(this,ip,port));		
 	}
 
 	@Override
