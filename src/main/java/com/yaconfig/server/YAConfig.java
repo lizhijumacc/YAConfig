@@ -204,4 +204,8 @@ public class YAConfig{
 		STATUS = status;
 		reportStatus();
 	}
+
+	public static void dumpPackage(String string, Object msg) {
+		//System.out.println(string + msg.toString());
+	}
 }

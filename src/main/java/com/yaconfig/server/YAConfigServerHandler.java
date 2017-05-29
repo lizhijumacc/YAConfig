@@ -14,14 +14,14 @@ public class YAConfigServerHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-		cause.printStackTrace();
+		server.removeChannel(ctx.channel());
 		ctx.close();
 	}
 	
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		YAMessage yamsg = (YAMessage)msg;
-		System.out.println("server rcv a massge:" + yamsg.toString());
+		YAConfig.dumpPackage("server rcv a massge:", yamsg);
 		server.processMessage(yamsg);
 	}
 	

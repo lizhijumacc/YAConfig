@@ -129,13 +129,10 @@ public class YAConfigClient implements Runnable{
 									&& currentMaster.getPort().equals(String.valueOf(address.getPort()))){
 								if(channel.isActive()){
 									try {
-										System.out.println("send to master:" + yamsg.toString());
 										channel.writeAndFlush(yamsg).sync();
 									} catch (InterruptedException e) {
 										e.printStackTrace();
 									}			
-								}else{
-									System.out.println("Current Master Channel is not Active now!" + currentMaster.getServerId());
 								}
 							}
 						}

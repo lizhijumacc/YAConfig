@@ -68,6 +68,9 @@ public class EndPointSet {
 							}
 						}
 					}
+				}else{
+					YAConfig.changeStatus(EndPoint.EndPointStatus.ELECTING);
+					voteNextMaster();
 				}
 			}			
 		}
