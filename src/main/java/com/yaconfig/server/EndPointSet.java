@@ -168,6 +168,8 @@ public class EndPointSet {
 	}
 
 	protected void reElection() {
+		
+			YAConfig.changeStatus(EndPoint.EndPointStatus.ELECTING);
         	//start status barrier to wait all the other endpoint status change to ELECTING
 			//proposal the node as master which has minimum SERVER_ID
 			voteNextMaster();
