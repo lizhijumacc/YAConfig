@@ -15,7 +15,7 @@ import com.yaconfig.commands.PutCommand;
 public class EndPointSet {
 	public ConcurrentHashMap<String, EndPoint> eps;
 	
-	//elected master by quorums, if YAConfig.status is ELECTING,
+	//elected master by quorums, if yaconfig.status is ELECTING,
 	//the currentMaster is the last elected master
 	public volatile EndPoint currentMaster;
 	
@@ -24,6 +24,8 @@ public class EndPointSet {
 	
 	private Integer resolutionThreshold;
 	
+	private YAConfig yaconfig;
+	
 	private final Runnable masterListeningTask = new Runnable(){
 		@Override
 		public void run(){
@@ -31,10 +33,10 @@ public class EndPointSet {
 				if(hasEnoughAliveEP()){
 					//if there is no master in system or master conflict
 					if(needElectMaster()){
-						YAConfig.changeStatus(EndPoint.EndPointStatus.ELECTING);
+						yaconfig.changeStatus(EndPoint.Status.ELECTING);
 						voteNextMaster();
-					}else if(YAConfig.STATUS != EndPoint.EndPointStatus.LEADING){
-						YAConfig.changeStatus(EndPoint.EndPointStatus.FOLLOWING);
+					}else if(yaconfig.STATUS != EndPoint.Status.LEADING){
+						yaconfig.changeStatus(EndPoint.Status.FOLLOWING);
 						//init set master.
 						if(currentMaster == null){
 							setMasterLocal();
@@ -48,10 +50,10 @@ public class EndPointSet {
 						EndPoint ep = (EndPoint)eps.get(key);
 						
 						if(System.currentTimeMillis() - ep.heartbeatTimestamp 
-								> 2 * YAConfig.HEARTBEAT_INTVAL
-								&& ep.status != EndPoint.EndPointStatus.DEAD){
-							ep.status = EndPoint.EndPointStatus.DEAD;
-							YAConfig.printImportant("CHECK EP DEAD", ep.getServerId() + " dead!");
+								> 2 * yaconfig.HEARTBEAT_INTVAL
+								&& ep.status != EndPoint.Status.DEAD){
+							ep.status = EndPoint.Status.DEAD;
+							yaconfig.printImportant("CHECK EP DEAD", ep.getServerId() + " dead!");
 							if(ep.equals(currentMaster)){
 								electingService.execute(masterElectingTask);
 							}
@@ -63,13 +65,13 @@ public class EndPointSet {
 							//2. if the master candidate which is elected by quorums is dead during 
 							//   notify period, the currentMaster may never be set
 							else if(ep.equals(nextMaster) 
-									&& YAConfig.STATUS == EndPoint.EndPointStatus.ELECTING){
+									&& yaconfig.STATUS == EndPoint.Status.ELECTING){
 								voteNextMaster();
 							}
 						}
 					}
 				}else{
-					YAConfig.changeStatus(EndPoint.EndPointStatus.ELECTING);
+					yaconfig.changeStatus(EndPoint.Status.ELECTING);
 					voteNextMaster();
 				}
 			}			
@@ -94,9 +96,10 @@ public class EndPointSet {
 	
 	private ExecutorService electingService = Executors.newCachedThreadPool();
 	
-	public EndPointSet(){
+	public EndPointSet(YAConfig yaconfig){
 		eps = new ConcurrentHashMap<String,EndPoint>();
-		resolutionThreshold = (YAConfig.quorums / 2) + 1;
+		resolutionThreshold = (yaconfig.quorums / 2) + 1;
+		this.yaconfig = yaconfig;
 	}
 	
 	public void run() {
@@ -111,12 +114,12 @@ public class EndPointSet {
 		}
 	}
 
-	public void setEPStatus(String key, String status) {
+	public void setEPStatus(String key, int status) {
 		EndPoint ep = eps.get(getServerIdFromKey(key));
 		
 		if(null != ep){
-			EndPoint.EndPointStatus preStatus = ep.status;
-			ep.status = EndPoint.EndPointStatus.valueOf(status);
+			int preStatus = ep.status;
+			ep.status = status;
 			if(preStatus != ep.status){
 				printAllStatus();
 			}
@@ -132,7 +135,7 @@ public class EndPointSet {
 	public void setMasterLocal() {
 		for(Entry<String,EndPoint> e : eps.entrySet()){
 			EndPoint ep = e.getValue();
-			if(ep.status == EndPoint.EndPointStatus.LEADING){
+			if(ep.status == EndPoint.Status.LEADING){
 				currentMaster = ep;
 			}
 		}
@@ -144,14 +147,14 @@ public class EndPointSet {
 			for(Iterator<String> it = eps.keySet().iterator();it.hasNext();){
 				String key = it.next();
 				EndPoint ep = (EndPoint)eps.get(key);
-				if(ep.status == EndPoint.EndPointStatus.LEADING){
+				if(ep.status == EndPoint.Status.LEADING){
 					leaderCount ++;
 				}
 			}
 		}
 		
 		//if I am leading, but not get status report in this moments
-		if(leaderCount == 0 && YAConfig.IS_MASTER){
+		if(leaderCount == 0 && yaconfig.IS_MASTER){
 			leaderCount++;
 		}
 		
@@ -172,7 +175,7 @@ public class EndPointSet {
 
 	protected void reElection() {
 		
-			YAConfig.changeStatus(EndPoint.EndPointStatus.ELECTING);
+			yaconfig.changeStatus(EndPoint.Status.ELECTING);
         	//start status barrier to wait all the other endpoint status change to ELECTING
 			//proposal the node as master which has minimum SERVER_ID
 			voteNextMaster();
@@ -181,13 +184,13 @@ public class EndPointSet {
 			for(Iterator<String> it = eps.keySet().iterator();it.hasNext();){
 				String key = it.next();
 				EndPoint ep = (EndPoint)eps.get(key);
-				if(ep.status != EndPoint.EndPointStatus.DEAD || 
-						ep.status != EndPoint.EndPointStatus.ELECTING){
+				if(ep.status != EndPoint.Status.DEAD || 
+						ep.status != EndPoint.Status.ELECTING){
 					notwatingeps.add(ep);
 				}
 				
-				if(ep.status == EndPoint.EndPointStatus.DEAD || 
-						ep.status == EndPoint.EndPointStatus.UNKOWN){
+				if(ep.status == EndPoint.Status.DEAD || 
+						ep.status == EndPoint.Status.UNKOWN){
 					deadCount++;
 				}
 			}
@@ -196,9 +199,9 @@ public class EndPointSet {
 	        //if the old leader is fake dead(because of networking jitter) in this waiting period,
 	        //the condition may never be achieved,so break the forever loop when old leader online again.
 			if(notwatingeps.contains(currentMaster)
-					&& currentMaster.status == EndPoint.EndPointStatus.LEADING
-					&& !YAConfig.IS_MASTER){
-				YAConfig.changeStatus(EndPoint.EndPointStatus.FOLLOWING);
+					&& currentMaster.status == EndPoint.Status.LEADING
+					&& !yaconfig.IS_MASTER){
+				yaconfig.changeStatus(EndPoint.Status.FOLLOWING);
 			}
 			
 			//if all the endpoint is waiting for new leader
@@ -213,8 +216,8 @@ public class EndPointSet {
 		nextMaster = getNextMaster();
 		if(nextMaster != null){
 	        PutCommand voteNextMaster = new PutCommand("put");
-	        voteNextMaster.setExecutor(YAConfig.exec);
-	        voteNextMaster.execute(("com.yaconfig.node." + YAConfig.SERVER_ID + ".vote"),
+	        voteNextMaster.setExecutor(yaconfig.exec);
+	        voteNextMaster.execute(("com.yaconfig.node." + yaconfig.SERVER_ID + ".vote"),
 	        		nextMaster.getServerId().getBytes());
 	        electingService.execute(countVotesTask);
 		}
@@ -250,17 +253,17 @@ public class EndPointSet {
 
 	private void setMaster(String serverId) {
 		//if I am master, notify all the others & change myself status
-		if(serverId.equals(YAConfig.SERVER_ID) && !YAConfig.IS_MASTER){
+		if(serverId.equals(yaconfig.SERVER_ID) && !yaconfig.IS_MASTER){
 	        PutCommand setMaster = new PutCommand("put");
-	        setMaster.setExecutor(YAConfig.exec);
-	        setMaster.execute("com.yaconfig.master",YAConfig.SERVER_ID.getBytes());
-			YAConfig.IS_MASTER = true;
-			YAConfig.changeStatus(EndPoint.EndPointStatus.LEADING);
+	        setMaster.setExecutor(yaconfig.exec);
+	        setMaster.execute("com.yaconfig.master",yaconfig.SERVER_ID.getBytes());
+			yaconfig.IS_MASTER = true;
+			yaconfig.changeStatus(EndPoint.Status.LEADING);
 		}
 		//if I am not master, set nextMaster to elected master
 		//note that: here nextMaster is not pre-nexeMaster which I voted to
 		//in case of the elected master dead during the notify master period.
-		else if(!serverId.equals(YAConfig.SERVER_ID) && eps.get(serverId) != null){
+		else if(!serverId.equals(yaconfig.SERVER_ID) && eps.get(serverId) != null){
 			nextMaster = eps.get(serverId);
 		}
 	}
@@ -273,9 +276,9 @@ public class EndPointSet {
 			EndPoint ep = (EndPoint)eps.get(key);
 			int sid = Integer.parseInt(ep.getServerId());
 			if(sid < minId && ep.VID >= maxVID
-					&& ep.status == EndPoint.EndPointStatus.ELECTING 
-					 	|| ep.status == EndPoint.EndPointStatus.LEADING
-					 	|| ep.status == EndPoint.EndPointStatus.FOLLOWING){
+					&& ep.status == EndPoint.Status.ELECTING 
+					 	|| ep.status == EndPoint.Status.LEADING
+					 	|| ep.status == EndPoint.Status.FOLLOWING){
 				minId = sid;
 			}
 		}
@@ -289,15 +292,15 @@ public class EndPointSet {
 	
 	public void setCurrentMaster(String masterId) {
 		currentMaster = eps.get(masterId);
-		YAConfig.printImportant("MASTER CHANGE", "curren master is:" + masterId);
-		if(!masterId.equals(YAConfig.SERVER_ID)){
-			YAConfig.changeStatus(EndPoint.EndPointStatus.FOLLOWING);
+		yaconfig.printImportant("MASTER CHANGE", "curren master is:" + masterId);
+		if(!masterId.equals(yaconfig.SERVER_ID)){
+			yaconfig.changeStatus(EndPoint.Status.FOLLOWING);
 		}
 	}
 
 	private boolean isLeading(String masterId) {
 		if(masterId != null && eps.get(masterId) != null){
-			return eps.get(masterId).status == EndPoint.EndPointStatus.LEADING;
+			return eps.get(masterId).status == EndPoint.Status.LEADING;
 		}
 		return false;
 	}
@@ -307,7 +310,7 @@ public class EndPointSet {
 		for(Iterator<String> it = eps.keySet().iterator();it.hasNext();){
 			String key = it.next();
 			EndPoint ep = (EndPoint)eps.get(key);
-			if(ep.status == EndPoint.EndPointStatus.DEAD){
+			if(ep.status == EndPoint.Status.DEAD){
 				countDead++;
 			}
 		}

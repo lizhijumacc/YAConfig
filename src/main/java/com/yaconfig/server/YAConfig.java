@@ -1,51 +1,56 @@
 package com.yaconfig.server;
 
 import java.net.InetAddress;
-import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import com.yaconfig.commands.Executor;
-import com.yaconfig.commands.PutCallback;
 import com.yaconfig.commands.PutCommand;
-import com.yaconfig.server.EndPoint.EndPointStatus;
 
 public class YAConfig{
 
 	protected static final long HEARTBEAT_INTVAL = 2000; //ms
 
-	private static EndPointSet eps;
+	private EndPointSet eps;
 	
-	private static Watchers ws = new Watchers();
+	private Watchers ws;
 	
-	public static Executor exec = new Executor();
+	public Executor exec;
 	
-	public static volatile String SERVER_ID;
+	public volatile String SERVER_ID;
 	
-	public static String HOST;
+	public String HOST;
 	
-	public static volatile boolean IS_MASTER;
+	public volatile boolean IS_MASTER;
 	
-	public static volatile EndPoint.EndPointStatus STATUS = EndPoint.EndPointStatus.INIT;
+	public volatile int STATUS = EndPoint.Status.INIT;
 	
-	public static Integer quorums;
+	private static final AtomicIntegerFieldUpdater<YAConfig> STATUS_UPDATER = 
+			AtomicIntegerFieldUpdater.newUpdater(YAConfig.class, "STATUS");
 	
-	private static Thread heartbeat;
+	public Integer quorums;
 	
-	public static volatile int VID;
+	private Thread heartbeat;
 	
-	public static YAConfigClient client;
+	public volatile int VID;
 	
-	public static YAConfigServer server;
+	public YAConfigClient client;
 	
-	public static void init(int port) throws Exception {
+	public YAConfigServer server;
+	
+	public void init(int port) throws Exception {
 		
 		SERVER_ID = String.valueOf(port);
+		
+		exec = new Executor(this);
+		
+		ws = new Watchers();
 		
 		IS_MASTER = false;
 		
 		//should read from local config file.
 		quorums = 3;
         
-		eps = new EndPointSet();
+		eps = new EndPointSet(this);
 		eps.add(new EndPoint("4247","127.0.0.1:4247"));
 		eps.add(new EndPoint("4248","127.0.0.1:4248"));
 		eps.add(new EndPoint("4249","127.0.0.1:4249"));
@@ -60,7 +65,7 @@ public class YAConfig{
 				
 				switch (suffix) {
 				case "status":
-				    getEps().setEPStatus(key,new String(value));
+				    getEps().setEPStatus(key,Integer.parseInt(new String(value)));
 				    break;
 				case "vote":
 					getEps().setVotes(key,new String(value));
@@ -106,7 +111,7 @@ public class YAConfig{
         put.setExecutor(exec);
 		put.execute(("com.yaconfig.node." + SERVER_ID),HOST.getBytes());
 	
-		client = new YAConfigClient();
+		client = new YAConfigClient(this);
 		Thread clientThread = new Thread("clientThread"){
 			@Override
 			public void run(){
@@ -114,7 +119,7 @@ public class YAConfig{
 			}
 		};
 		
-		server = new YAConfigServer(port);
+		server = new YAConfigServer(port,this);
 		Thread serverThread = new Thread("serverThread"){
 			@Override
 			public void run(){
@@ -139,36 +144,36 @@ public class YAConfig{
 		return ws;
 	}
 	
-	public static void notifyWatchers(String key,byte[] value){
+	public void notifyWatchers(String key,byte[] value){
 		ws.notifyWatchers(key,value);
 	}
 
-	public static void reportStatus() {
+	public void reportStatus() {
         PutCommand changeStatus = new PutCommand("put");
-        changeStatus.setExecutor(YAConfig.exec);
-        changeStatus.execute(("com.yaconfig.node." + YAConfig.SERVER_ID + ".status"),
-        		YAConfig.STATUS.toString().getBytes());
+        changeStatus.setExecutor(exec);
+        changeStatus.execute(("com.yaconfig.node." + this.SERVER_ID + ".status"),
+        		String.valueOf(STATUS).getBytes());
 	}
 
-	public static EndPointSet getEps() {
+	public EndPointSet getEps() {
 		return eps;
 	}
 
-	public static void setEps(EndPointSet eps) {
-		YAConfig.eps = eps;
+	public void setEps(EndPointSet eps) {
+		this.eps = eps;
 	}
 
-	public static void broadcastToQuorums(YAMessage msg) {
+	public void broadcastToQuorums(YAMessage msg) {
 		if(server != null){
 			server.broadcastToQuorums(msg);
 		}
 	}
 
-	public static void redirectToMaster(YAMessage msg) {
+	public void redirectToMaster(YAMessage msg) {
 		client.redirectToMaster(msg);
 	}
 
-	public static void processMessage(YAMessage yamsg) {
+	public void processMessage(YAMessage yamsg) {
 		if(yamsg.type == YAMessage.Type.PUT){
 			PutCommand put = new PutCommand("put");
 			put.setExecutor(exec);
@@ -187,7 +192,8 @@ public class YAConfig{
         	port = 4248;
         }
         
-        YAConfig.init(port);
+        YAConfig yaconfig = new YAConfig();
+        yaconfig.init(port);
     }
     
 	public static void printImportant(String head,String info){
@@ -200,8 +206,13 @@ public class YAConfig{
     	}
     }
 	
-	public static void changeStatus(EndPointStatus status) {
-		STATUS = status;
+	public void changeStatus(int newStatus) {
+		for(;;){
+			int oldStatus = STATUS_UPDATER.get(this);
+			if(STATUS_UPDATER.compareAndSet(this, oldStatus, newStatus)){
+				break;
+			}
+		}
 		reportStatus();
 	}
 

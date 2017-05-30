@@ -31,10 +31,13 @@ public class YAConfigServer implements Runnable{
 	
 	Thread boardcastThread;
 	
-	public YAConfigServer(int port){
+	private YAConfig yaconfig;
+	
+	public YAConfigServer(int port,YAConfig yaconfig){
 		this.port = port;
 		channels = new ConcurrentHashMap<String,Channel>();
 		boardcastQueue = new YAMessageQueue();
+		this.yaconfig = yaconfig;
 	}
 	
 	@Override
@@ -85,7 +88,7 @@ public class YAConfigServer implements Runnable{
 							new ObjectEncoder(),
 							//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 							new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-			    			new YAConfigServerHandler(YAConfig.server)
+			    			new YAConfigServerHandler(yaconfig.server)
 			    			);
 				}
 				 
@@ -144,7 +147,7 @@ public class YAConfigServer implements Runnable{
 	}
 	
 	public void processMessage(YAMessage yamsg) {
-		YAConfig.processMessage(yamsg);
+		yaconfig.processMessage(yamsg);
 	}
 
 	public void removeChannel(Channel channel) {

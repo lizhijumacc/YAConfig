@@ -15,17 +15,17 @@ public class EndPoint {
 	
 	public String voteMaster;
 	
-	public enum EndPointStatus{
-		ALIVE,
-		DEAD,
-		ELECTING,
-		LEADING,
-		FOLLOWING,
-		INIT,
-		UNKOWN;
+	public class Status{
+		public static final int ALIVE = 0;
+		public static final int DEAD = 1;
+		public static final int ELECTING = 2;
+		public static final int LEADING = 3;
+		public static final int FOLLOWING = 4;
+		public static final int INIT = 5;
+		public static final int UNKOWN = 6;
 	}
 	
-	public volatile EndPointStatus status = EndPointStatus.UNKOWN;
+	public volatile int status = Status.UNKOWN;
 	
 	public EndPoint(String serverId,String host){
 		String[] sp = host.split(":");

@@ -42,15 +42,18 @@ public class YAConfigClient implements Runnable{
 	
 	Thread clientRcvMessageThread;
 	
-	public YAConfigClient(){
+	private YAConfig yaconfig;
+	
+	public YAConfigClient(YAConfig yaconfig){
 		loop = new NioEventLoopGroup();
+		this.yaconfig = yaconfig;
 		//the number of endpoint is countable,use BIO read the 
 		//quorums messages.
-		connectService = Executors.newFixedThreadPool(YAConfig.quorums);
+		connectService = Executors.newFixedThreadPool(yaconfig.quorums);
 		channels = new ConcurrentHashMap<String,Channel>();
 		rcvQueue = new YAMessageQueue();
 		sendToMasterQueue = new YAMessageQueue();
-		processMsgService = Executors.newFixedThreadPool(YAConfig.quorums);
+		processMsgService = Executors.newFixedThreadPool(yaconfig.quorums);
 	}
 	
 	public void connect(final String ip,final int port){
@@ -68,7 +71,7 @@ public class YAConfigClient implements Runnable{
 						 new ObjectEncoder(),
 						 //new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 						 new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-						 new YAConfigClientHandler(YAConfig.client));
+						 new YAConfigClientHandler(yaconfig.client));
 			 	}
 			}).option(ChannelOption.SO_KEEPALIVE,true)
 			  .option(ChannelOption.TCP_NODELAY,true);
@@ -78,7 +81,7 @@ public class YAConfigClient implements Runnable{
 
 	@Override
 	public void run() {
-		for(Entry<String,EndPoint> e: YAConfig.getEps().eps.entrySet()){
+		for(Entry<String,EndPoint> e: yaconfig.getEps().eps.entrySet()){
 			EndPoint ep = e.getValue();
 			final String ip = ep.getIp();
 			final int port = Integer.parseInt(ep.getPort());
@@ -118,7 +121,7 @@ public class YAConfigClient implements Runnable{
 						e1.printStackTrace();
 					}
 					
-					EndPoint currentMaster = YAConfig.getEps().currentMaster;
+					EndPoint currentMaster = yaconfig.getEps().currentMaster;
 					
 					if(currentMaster != null && yamsg != null){
 						for(Entry<String,Channel> ep: channels.entrySet()){
@@ -197,7 +200,7 @@ public class YAConfigClient implements Runnable{
 			return;
 		}
 		YAHashMap.getInstance().put(yamsg.key, yamsg.value);
-		YAConfig.notifyWatchers(yamsg.key, yamsg.value);
+		yaconfig.notifyWatchers(yamsg.key, yamsg.value);
 	}
 
 	public void redirectToMaster(YAMessage msg) {
