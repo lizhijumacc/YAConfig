@@ -32,14 +32,14 @@ public class YAConfig{
 	private Thread heartbeat;
 	
 	//the max ID of YAMessage which is already commit 
-	public volatile long VID;
+	public static volatile long VID;
 	
 	//the max ID of YAMessage which is already promised by Acceptors but not commit yet 
-	public volatile long promisedNum;
+	public static volatile long promisedNum;
 	
 	//the max ID of YAMessage which is wait for Acceptors promise
 	//in a moment: VID < promisedNum < unpromisedNum
-	public volatile long unpromisedNum;
+	public static volatile long unpromisedNum;
 	
 	public YAConfigClient client;
 	
@@ -54,7 +54,7 @@ public class YAConfig{
 		ws = new Watchers();
 		
 		VID = 0;
-		promisedNum = 0;
+		promisedNum = -1;
 		unpromisedNum = 0;
 		
 		IS_MASTER = false;
@@ -151,15 +151,31 @@ public class YAConfig{
         heartbeat.start();
         getEps().run();
         
-        Thread.sleep(10000);
-        if(IS_MASTER){
-        	for(int i=0;i<5;i++){
-        		System.out.println("write!!!!!!!!!!!!!");
-        		PutCommand p = new PutCommand("put");
-        		p.setExecutor(exec);
-        		p.execute("com.yaconfig.test", "testvalue".getBytes(), false);
+  
+        Watcher test = new Watcher("com.yaconfig.test");
+		test.setChangeListener(new IChangeListener(){
+
+			@Override
+			public void onChange(String key, byte[] value) {
+				System.out.println(new String(value));
+			}
+			
+		});
+		ws.addWatcher(test);
+        
+        while(true){
+        	if(IS_MASTER){
+        		Thread.sleep(5000);
+	        	for(int i=0;i<10000000;i++){
+	        		PutCommand p = new PutCommand("put");
+	        		p.setExecutor(exec);
+	        		p.execute("com.yaconfig.test", "testvalue".getBytes(), false);
+	        		Thread.sleep(10);
+	        	}
         	}
         }
+        
+
 	}
 
 	public Watchers getWatcherSet() {
@@ -235,7 +251,7 @@ public class YAConfig{
 
 	public static void dumpPackage(String string, Object msg) {
 		if(!msg.toString().contains("status")){
-			System.out.println(string + msg.toString());
+			//System.out.println(string + msg.toString());
 		}
 	}
 
@@ -245,6 +261,9 @@ public class YAConfig{
 	}
 
 	public void setVID(String serverID, Long sequenceNum) {
+		if(serverID == SERVER_ID){
+			VID = sequenceNum;
+		}
 		eps.setVID(serverID,sequenceNum);
 	}
 }

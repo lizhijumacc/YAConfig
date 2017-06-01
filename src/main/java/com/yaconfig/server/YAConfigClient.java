@@ -200,23 +200,33 @@ public class YAConfigClient implements Runnable{
 			return;
 		}
 
-		if(yamsg.type == YAMessage.Type.PUT 
-				&& yamsg.sequenceNum > yaconfig.VID){
-			promise(yamsg);
-		}else if(yamsg.type == YAMessage.Type.COMMIT 
-				|| yamsg.type == YAMessage.Type.PUT_NOPROMISE){
+		if(yamsg.type == YAMessage.Type.PUT){
+			if(yamsg.sequenceNum > yaconfig.VID){
+				promise(yamsg);
+			}else{
+				System.out.println("yamsg.sequenceNum" + yamsg.sequenceNum);
+				System.out.println("yaconfig.VID" + yaconfig.VID);
+				nack(yamsg);
+			}
+		}else if(yamsg.type == YAMessage.Type.COMMIT){
 			learn(yamsg);
+		}else if(yamsg.type == YAMessage.Type.PUT_NOPROMISE){
+			writeToStorage(yamsg);
 		}
 	}
 
 	private void learn(YAMessage yamsg) {
 		yaconfig.VID = yamsg.sequenceNum;
+		writeToStorage(yamsg);	
+	}
+
+	private void writeToStorage(YAMessage yamsg) {
 		YAHashMap.getInstance().put(yamsg.key, yamsg.value);
-		yaconfig.notifyWatchers(yamsg.key, yamsg.value);	
+		yaconfig.notifyWatchers(yamsg.key, yamsg.value);
 	}
 
 	private void promise(YAMessage yamsg) {
-		yaconfig.promisedNum = yamsg.sequenceNum;
+		YAConfig.promisedNum = yamsg.sequenceNum;
 		yamsg.type = YAMessage.Type.PROMISE;
 		yamsg.serverID = YAConfig.SERVER_ID;
 		try {
@@ -224,6 +234,19 @@ public class YAConfigClient implements Runnable{
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	private void nack(YAMessage yamsg){
+		//in muti-paxos no need to send nack message,
+		//make sure there is only one master is enough
+		System.out.println("SHOULD NOT BE HERE!");
+		/*yamsg.serverID = YAConfig.SERVER_ID;
+		yamsg.type = YAMessage.Type.NACK;
+		try {
+			sendToMasterQueue.push(yamsg);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}*/
 	}
 
 	public void redirectToMaster(YAMessage msg) {

@@ -18,12 +18,12 @@ public class UnPromisedMessages{
 	public void countPromise(YAMessage msg){
 		Long sequenceNum = msg.sequenceNum;
 		ArrayList<String> promisedServerIDs;
-		
+
 		synchronized(this){
 			if(null != promise.get(sequenceNum)){
 				promisedServerIDs = promise.get(sequenceNum);
 				//TCP may re-send messages when timeout
-				if(!alreadyPormised(promisedServerIDs,msg.serverID)){		
+				if(!alreadyPromised(promisedServerIDs,msg.serverID)){		
 					promisedServerIDs.add(msg.serverID);
 				}
 			}else{
@@ -33,19 +33,19 @@ public class UnPromisedMessages{
 			}
 			
 			//collect enough promise
-			if(promisedServerIDs.size() >= (YAConfig.quorums / 2) + 1){
+			if(promisedServerIDs.size() == YAConfig.quorums){
 				YAMessage yamsg = msgs.get(sequenceNum);
 				yamsg.type = YAMessage.Type.COMMIT;
 				this.server.broadcastToQuorums(yamsg);
-				this.server.setVID(yamsg.serverID,sequenceNum);
-
+				//should setVID when committed
+				//this.server.setVID(yamsg.serverID,sequenceNum);
 				promise.remove(sequenceNum);
 				msgs.remove(sequenceNum);
 			}
 		}
 	}
 	
-	private boolean alreadyPormised(ArrayList<String> promisedServerIDs, String serverID) {
+	private boolean alreadyPromised(ArrayList<String> promisedServerIDs, String serverID) {
 		for(String s : promisedServerIDs){
 			if(s.equals(serverID)){
 				return true;

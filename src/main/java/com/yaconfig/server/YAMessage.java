@@ -17,7 +17,8 @@ public class YAMessage implements Serializable {
 		GET,
 		GET_LOCAL,
 		PROMISE,
-		COMMIT
+		COMMIT,
+		NACK
 	}
 	
 	public YAMessage(String key,byte[] value,Type type,long sequenceNum){

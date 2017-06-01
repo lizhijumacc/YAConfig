@@ -54,6 +54,7 @@ public class EndPointSet {
 								&& ep.status != EndPoint.Status.DEAD){
 							ep.status = EndPoint.Status.DEAD;
 							YAConfig.printImportant("CHECK EP DEAD", ep.getServerId() + " dead!");
+							System.out.println(yaconfig.VID);
 							if(ep.equals(currentMaster)){
 								electingService.execute(masterElectingTask);
 							}
@@ -221,7 +222,7 @@ public class EndPointSet {
 	        PutCommand voteNextMaster = new PutCommand("put");
 	        voteNextMaster.setExecutor(yaconfig.exec);
 	        voteNextMaster.execute(("com.yaconfig.node." + YAConfig.SERVER_ID + ".vote"),
-	        		nextMaster.getServerId().getBytes(),true);
+	        		(nextMaster.getServerId() + "///" + nextMaster.VID).getBytes(),true);
 	        electingService.execute(countVotesTask);
 		}
 	}
@@ -261,7 +262,7 @@ public class EndPointSet {
 	        setMaster.setExecutor(yaconfig.exec);
 	        setMaster.execute("com.yaconfig.master",YAConfig.SERVER_ID.getBytes(),true);
 			yaconfig.IS_MASTER = true;
-			yaconfig.unpromisedNum = eps.get(YAConfig.SERVER_ID).VID;
+			YAConfig.unpromisedNum = eps.get(YAConfig.SERVER_ID).VID;
 			yaconfig.changeStatus(EndPoint.Status.LEADING);
 		}
 		//if I am not master, set nextMaster to elected master
@@ -291,7 +292,11 @@ public class EndPointSet {
 	}
 
 	public void setVotes(String key, String string) {
-		eps.get(getServerIdFromKey(key)).voteMaster = string;
+		EndPoint ep = eps.get(getServerIdFromKey(key));
+		if(ep != null){
+			ep.voteMaster = string.substring(0,string.lastIndexOf("///"));
+			ep.VID = Long.parseLong(string.substring(string.lastIndexOf("///") + 3));
+		}
 	}
 	
 	public void setCurrentMaster(String masterId) {

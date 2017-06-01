@@ -158,9 +158,7 @@ public class YAConfigServer implements Runnable{
 	
 	public void processMessage(YAMessage yamsg) {
 		if(yamsg.type == YAMessage.Type.PUT){
-			PutCommand put = new PutCommand("put");
-			put.setExecutor(yaconfig.exec);
-			put.execute(yamsg.key,yamsg.value,false);
+			proposal(yamsg);
 		}else if(yamsg.type == YAMessage.Type.PUT_NOPROMISE){
 			PutCommand put = new PutCommand("put");
 			put.setExecutor(yaconfig.exec);
@@ -171,6 +169,12 @@ public class YAConfigServer implements Runnable{
 				&& yamsg.type == YAMessage.Type.PROMISE){
 			countPromise(yamsg);
 		}
+	}
+
+	private void proposal(YAMessage yamsg) {
+		PutCommand put = new PutCommand("put");
+		put.setExecutor(yaconfig.exec);
+		put.execute(yamsg.key,yamsg.value,false);
 	}
 
 	public void removeChannel(Channel channel) {
