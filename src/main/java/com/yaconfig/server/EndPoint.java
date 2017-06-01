@@ -3,7 +3,7 @@ package com.yaconfig.server;
 public class EndPoint {
 	
 	//the current replica version ID in this endpoint
-	public  int VID = Integer.MIN_VALUE;
+	public long VID = 0;
 
 	private String ip;
 	

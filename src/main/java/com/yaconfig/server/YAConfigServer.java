@@ -5,6 +5,8 @@ import java.net.InetSocketAddress;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.yaconfig.commands.PutCommand;
+
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -12,8 +14,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
@@ -29,6 +29,8 @@ public class YAConfigServer implements Runnable{
 	
 	YAMessageQueue boardcastQueue;
 	
+	private UnPromisedMessages unPomisedMsgs;
+	
 	Thread boardcastThread;
 	
 	private YAConfig yaconfig;
@@ -38,6 +40,11 @@ public class YAConfigServer implements Runnable{
 		channels = new ConcurrentHashMap<String,Channel>();
 		boardcastQueue = new YAMessageQueue();
 		this.yaconfig = yaconfig;
+		unPomisedMsgs = new UnPromisedMessages(this);
+	}
+	
+	public void countPromise(YAMessage msg){
+		this.unPomisedMsgs.countPromise(msg);
 	}
 	
 	@Override
@@ -49,6 +56,9 @@ public class YAConfigServer implements Runnable{
 					YAMessage yamsg = null;
 					try {
 						yamsg = boardcastQueue.take();
+						if(yamsg.type == YAMessage.Type.PUT){
+							unPomisedMsgs.push(yamsg);
+						}
 					} catch (InterruptedException e1) {
 						e1.printStackTrace();
 					}
@@ -147,12 +157,29 @@ public class YAConfigServer implements Runnable{
 	}
 	
 	public void processMessage(YAMessage yamsg) {
-		yaconfig.processMessage(yamsg);
+		if(yamsg.type == YAMessage.Type.PUT){
+			PutCommand put = new PutCommand("put");
+			put.setExecutor(yaconfig.exec);
+			put.execute(yamsg.key,yamsg.value,false);
+		}else if(yamsg.type == YAMessage.Type.PUT_NOPROMISE){
+			PutCommand put = new PutCommand("put");
+			put.setExecutor(yaconfig.exec);
+			put.execute(yamsg.key,yamsg.value,true);			
+		}else if(yamsg.type == YAMessage.Type.GET){
+			//TODO
+		}else if(yaconfig.statusEquals(EndPoint.Status.LEADING)
+				&& yamsg.type == YAMessage.Type.PROMISE){
+			countPromise(yamsg);
+		}
 	}
 
 	public void removeChannel(Channel channel) {
 		InetSocketAddress address = (InetSocketAddress)channel.remoteAddress();
 		channels.remove(address.getHostName()+ ":" + String.valueOf(address.getPort()));
+	}
+
+	public void setVID(String serverID, Long sequenceNum) {
+		yaconfig.setVID(serverID,sequenceNum);
 	}
 	
 }

@@ -1,24 +1,17 @@
 package com.yaconfig.commands;
-
-import com.yaconfig.server.YAMessage;
-
 public class PutCommand extends Command{
 
-	public PutCallback callback;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 5378136152411869587L;
 	
 	public PutCommand(String name) {
 		super(name);
 	}
 
-	public void execute(String key,byte[] value) {
-		exec.put(new YAMessage(key,value,YAMessage.Type.PUT),callback);
+	public void execute(String key,byte[] value,boolean withoutpromise) {
+		exec.put(key,value,withoutpromise);
 	}
 
-	public void setCallback(PutCallback putCallback) {
-		callback = putCallback;
-	}
-
-	public void execute(YAMessage yamsg) {
-		exec.put(yamsg,callback);
-	}
 }

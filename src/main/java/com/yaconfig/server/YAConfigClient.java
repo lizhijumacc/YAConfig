@@ -199,8 +199,31 @@ public class YAConfigClient implements Runnable{
 		if(null == yamsg){
 			return;
 		}
+
+		if(yamsg.type == YAMessage.Type.PUT 
+				&& yamsg.sequenceNum > yaconfig.VID){
+			promise(yamsg);
+		}else if(yamsg.type == YAMessage.Type.COMMIT 
+				|| yamsg.type == YAMessage.Type.PUT_NOPROMISE){
+			learn(yamsg);
+		}
+	}
+
+	private void learn(YAMessage yamsg) {
+		yaconfig.VID = yamsg.sequenceNum;
 		YAHashMap.getInstance().put(yamsg.key, yamsg.value);
-		yaconfig.notifyWatchers(yamsg.key, yamsg.value);
+		yaconfig.notifyWatchers(yamsg.key, yamsg.value);	
+	}
+
+	private void promise(YAMessage yamsg) {
+		yaconfig.promisedNum = yamsg.sequenceNum;
+		yamsg.type = YAMessage.Type.PROMISE;
+		yamsg.serverID = YAConfig.SERVER_ID;
+		try {
+			sendToMasterQueue.push(yamsg);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void redirectToMaster(YAMessage msg) {

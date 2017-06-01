@@ -16,22 +16,30 @@ public class YAConfig{
 	
 	public Executor exec;
 	
-	public volatile String SERVER_ID;
+	public static String SERVER_ID;
 	
 	public String HOST;
 	
 	public volatile boolean IS_MASTER;
 	
-	public volatile int STATUS = EndPoint.Status.INIT;
+	private volatile int STATUS = EndPoint.Status.INIT;
 	
 	private static final AtomicIntegerFieldUpdater<YAConfig> STATUS_UPDATER = 
 			AtomicIntegerFieldUpdater.newUpdater(YAConfig.class, "STATUS");
 	
-	public Integer quorums;
+	public static Integer quorums;
 	
 	private Thread heartbeat;
 	
-	public volatile int VID;
+	//the max ID of YAMessage which is already commit 
+	public volatile long VID;
+	
+	//the max ID of YAMessage which is already promised by Acceptors but not commit yet 
+	public volatile long promisedNum;
+	
+	//the max ID of YAMessage which is wait for Acceptors promise
+	//in a moment: VID < promisedNum < unpromisedNum
+	public volatile long unpromisedNum;
 	
 	public YAConfigClient client;
 	
@@ -44,6 +52,10 @@ public class YAConfig{
 		exec = new Executor(this);
 		
 		ws = new Watchers();
+		
+		VID = 0;
+		promisedNum = 0;
+		unpromisedNum = 0;
 		
 		IS_MASTER = false;
 		
@@ -109,7 +121,7 @@ public class YAConfig{
 		//register self
         PutCommand put = new PutCommand("put");
         put.setExecutor(exec);
-		put.execute(("com.yaconfig.node." + SERVER_ID),HOST.getBytes());
+		put.execute(("com.yaconfig.node." + SERVER_ID),HOST.getBytes(),true);
 	
 		client = new YAConfigClient(this);
 		Thread clientThread = new Thread("clientThread"){
@@ -138,6 +150,16 @@ public class YAConfig{
 		Thread.sleep(1000);
         heartbeat.start();
         getEps().run();
+        
+        Thread.sleep(10000);
+        if(IS_MASTER){
+        	for(int i=0;i<5;i++){
+        		System.out.println("write!!!!!!!!!!!!!");
+        		PutCommand p = new PutCommand("put");
+        		p.setExecutor(exec);
+        		p.execute("com.yaconfig.test", "testvalue".getBytes(), false);
+        	}
+        }
 	}
 
 	public Watchers getWatcherSet() {
@@ -151,8 +173,8 @@ public class YAConfig{
 	public void reportStatus() {
         PutCommand changeStatus = new PutCommand("put");
         changeStatus.setExecutor(exec);
-        changeStatus.execute(("com.yaconfig.node." + this.SERVER_ID + ".status"),
-        		String.valueOf(STATUS).getBytes());
+        changeStatus.execute(("com.yaconfig.node." + SERVER_ID + ".status"),
+        		String.valueOf(STATUS).getBytes(),true);
 	}
 
 	public EndPointSet getEps() {
@@ -172,16 +194,6 @@ public class YAConfig{
 	public void redirectToMaster(YAMessage msg) {
 		client.redirectToMaster(msg);
 	}
-
-	public void processMessage(YAMessage yamsg) {
-		if(yamsg.type == YAMessage.Type.PUT){
-			PutCommand put = new PutCommand("put");
-			put.setExecutor(exec);
-			put.execute(yamsg);
-		}else if(yamsg.type == YAMessage.Type.GET){
-			//TODO
-		}
-	}
 	
     public static void main( String[] args ) throws Exception{
         int port;
@@ -189,7 +201,7 @@ public class YAConfig{
         if (args.length > 0){
         	port = Integer.parseInt(args[0]);
         }else{
-        	port = 4248;
+        	port = 4247;
         }
         
         YAConfig yaconfig = new YAConfig();
@@ -215,8 +227,24 @@ public class YAConfig{
 		}
 		reportStatus();
 	}
+	
+	public boolean statusEquals(int status){
+		int myStatus = STATUS_UPDATER.get(this);
+		return myStatus == status;
+	}
 
 	public static void dumpPackage(String string, Object msg) {
-		//System.out.println(string + msg.toString());
+		if(!msg.toString().contains("status")){
+			System.out.println(string + msg.toString());
+		}
+	}
+
+	public synchronized long getUnpromisedNum() {
+		unpromisedNum++;
+		return unpromisedNum;
+	}
+
+	public void setVID(String serverID, Long sequenceNum) {
+		eps.setVID(serverID,sequenceNum);
 	}
 }

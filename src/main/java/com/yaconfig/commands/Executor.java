@@ -19,24 +19,37 @@ public class Executor implements Serializable{
 		this.yaconfig = yaconfig;
 	}
 	
-	public void put(YAMessage yaMessage, PutCallback callback) {
-		if(yaMessage.type == YAMessage.Type.PUT){
-			if(yaconfig.STATUS == EndPoint.Status.ELECTING
-					||yaconfig.STATUS == EndPoint.Status.INIT
-					||yaconfig.STATUS == EndPoint.Status.LEADING){
-				yaconfig.broadcastToQuorums(yaMessage);
-			}else if(yaconfig.STATUS == EndPoint.Status.FOLLOWING){
-				yaconfig.redirectToMaster(yaMessage);
-			}else{
-				return;
-			}			
-		}
+	public void put(String key,byte[] value,boolean withoutPromise) {
+		YAMessage yaMessage;
 		
-		if(callback != null){
-			callback.callback();
-		}
+		if(yaconfig.statusEquals(EndPoint.Status.ELECTING)
+				||yaconfig.statusEquals(EndPoint.Status.INIT)
+				||yaconfig.statusEquals(EndPoint.Status.LEADING)){
+			if(withoutPromise){
+				yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,-1);
+			}else{
+				if(yaconfig.statusEquals(EndPoint.Status.LEADING)){
+					yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,yaconfig.getUnpromisedNum());
+				}else{
+					yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,-1);
+				}
+			}
+			
+			yaconfig.broadcastToQuorums(yaMessage);
+		}else if(yaconfig.statusEquals(EndPoint.Status.FOLLOWING)){
+			if(withoutPromise){
+				yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,0);
+			}else{
+				yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,0);
+			}
+			yaconfig.redirectToMaster(yaMessage);
+		}else{
+			return;
+		}			
+		
+		
 	}
-	
+
 	public byte[] get(String key){
 		return YAHashMap.getInstance().get(key);
 	}

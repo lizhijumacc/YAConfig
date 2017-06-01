@@ -8,21 +8,33 @@ public class YAMessage implements Serializable {
 	public byte[] value;
 	public Type type;
 	public long timestamp;
+	public long sequenceNum;
+	public String serverID;
 	
 	public enum Type{
 		PUT,
+		PUT_NOPROMISE,
 		GET,
 		GET_LOCAL,
+		PROMISE,
+		COMMIT
 	}
 	
-	public YAMessage(String key,byte[] value,Type type){
+	public YAMessage(String key,byte[] value,Type type,long sequenceNum){
 		this.key = key;
 		this.value = value;
 		this.type = type;
+		this.sequenceNum = sequenceNum;
+		this.serverID = YAConfig.SERVER_ID;
 		timestamp = System.currentTimeMillis();
 	}
 	
 	public String toString(){
-		return this.key + ": " + new String(this.value) + ": " + (this.timestamp/1000) % 100;
+		return  " from:" + this.serverID +
+				" type:"+ String.valueOf(this.type) +
+				" key:"+ this.key +
+				" value:" + new String(this.value) + 
+				//+ (this.timestamp/1000) % 100 + ":"
+				" sequence number:" + this.sequenceNum;
 	}
 }
