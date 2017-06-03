@@ -22,21 +22,17 @@ public class Executor implements Serializable{
 	public void put(String key,byte[] value,boolean withoutPromise) {
 		YAMessage yaMessage;
 		
-		if(yaconfig.statusEquals(EndPoint.Status.ELECTING)
-				||yaconfig.statusEquals(EndPoint.Status.INIT)
-				||yaconfig.statusEquals(EndPoint.Status.LEADING)){
-			if(withoutPromise){
-				yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,-1);
-			}else{
-				if(yaconfig.statusEquals(EndPoint.Status.LEADING)){
-					yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,yaconfig.getUnpromisedNum());
-				}else{
-					yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,-1);
-				}
-			}
-			
+		if(key == null){
+			return;
+		}
+		
+		if(yaconfig.isSystemMessage(key)){
+			yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,-1);
 			yaconfig.broadcastToQuorums(yaMessage);
-		}else if(yaconfig.statusEquals(EndPoint.Status.FOLLOWING)){
+			return;
+		}
+		
+		if(yaconfig.statusEquals(EndPoint.Status.FOLLOWING)){
 			if(withoutPromise){
 				yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,0);
 			}else{

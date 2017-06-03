@@ -49,12 +49,7 @@ public class EndPointSet {
 						String key = it.next();
 						EndPoint ep = (EndPoint)eps.get(key);
 						
-						if(System.currentTimeMillis() - ep.heartbeatTimestamp 
-								> 2 * YAConfig.HEARTBEAT_INTVAL
-								&& ep.status != EndPoint.Status.DEAD){
-							ep.status = EndPoint.Status.DEAD;
-							YAConfig.printImportant("CHECK EP DEAD", ep.getServerId() + " dead!");
-							System.out.println(yaconfig.VID);
+						if(ep.status == EndPoint.Status.DEAD){
 							if(ep.equals(currentMaster)){
 								electingService.execute(masterElectingTask);
 							}
@@ -110,7 +105,6 @@ public class EndPointSet {
 	//only add from config file.
 	public void add(EndPoint e){
 		if(!eps.contains(e)){
-			e.heartbeatTimestamp = System.currentTimeMillis();
 			eps.put(e.getServerId(), e);
 		}
 	}
@@ -126,8 +120,8 @@ public class EndPointSet {
 				if(preStatus != ep.status){
 					printAllStatus();
 				}
+				
 			}
-			ep.heartbeatTimestamp = System.currentTimeMillis();
 		}
 	}
 
@@ -221,7 +215,7 @@ public class EndPointSet {
 		if(nextMaster != null){
 	        PutCommand voteNextMaster = new PutCommand("put");
 	        voteNextMaster.setExecutor(yaconfig.exec);
-	        voteNextMaster.execute(("com.yaconfig.node." + YAConfig.SERVER_ID + ".vote"),
+	        voteNextMaster.execute((YAConfig.SYSTEM_PERFIX + ".node." + YAConfig.SERVER_ID + ".vote"),
 	        		(nextMaster.getServerId() + "///" + nextMaster.VID).getBytes(),true);
 	        electingService.execute(countVotesTask);
 		}
@@ -248,7 +242,7 @@ public class EndPointSet {
 			Integer count = voteBox.get(serverId);
 			if(count >= resolutionThreshold){
 				//set master only if I am master,
-				//other endpoint should be notified by "com.yaconfig.master" value
+				//other endpoint should be notified by "SYSTEM_PERFIX.master" value
 				setMaster(serverId);
 			}
 		}
@@ -260,7 +254,7 @@ public class EndPointSet {
 		if(serverId.equals(YAConfig.SERVER_ID) && !yaconfig.IS_MASTER){
 	        PutCommand setMaster = new PutCommand("put");
 	        setMaster.setExecutor(yaconfig.exec);
-	        setMaster.execute("com.yaconfig.master",YAConfig.SERVER_ID.getBytes(),true);
+	        setMaster.execute(YAConfig.SYSTEM_PERFIX + ".master",YAConfig.SERVER_ID.getBytes(),true);
 			yaconfig.IS_MASTER = true;
 			YAConfig.unpromisedNum = eps.get(YAConfig.SERVER_ID).VID;
 			yaconfig.changeStatus(EndPoint.Status.LEADING);
@@ -333,6 +327,22 @@ public class EndPointSet {
 		synchronized(eps){
 			EndPoint ep = eps.get(serverID);
 			ep.VID = sequenceNum;
+		}
+	}
+
+	public void peerDead(String ip, String port) {
+		if(ip != null && port != null){
+			for(Entry<String,EndPoint> e : eps.entrySet()){
+				EndPoint ep = e.getValue();
+				if(ep.getIp().equals(ip) && ep.getPort().equals(port)){
+					//no report to others
+					if(ep.status != EndPoint.Status.DEAD){
+						ep.status = EndPoint.Status.DEAD;
+						YAConfig.printImportant("CHECK EP DEAD", ep.getServerId() + " dead!");
+						System.out.println(YAConfig.VID);
+					}
+				}
+			}
 		}
 	}
 	

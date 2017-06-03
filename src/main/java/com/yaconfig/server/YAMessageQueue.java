@@ -17,4 +17,8 @@ public class YAMessageQueue {
 	public YAMessage take() throws InterruptedException{
 		return queue.take();
 	}
+	
+	public int size(){
+		return queue.size();
+	}
 }

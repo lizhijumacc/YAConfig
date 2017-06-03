@@ -10,6 +10,7 @@ public class YAMessage implements Serializable {
 	public long timestamp;
 	public long sequenceNum;
 	public String serverID;
+	public int serverStatus;
 	
 	public enum Type{
 		PUT,
@@ -27,6 +28,7 @@ public class YAMessage implements Serializable {
 		this.type = type;
 		this.sequenceNum = sequenceNum;
 		this.serverID = YAConfig.SERVER_ID;
+		this.serverStatus = YAConfig.STATUS;
 		timestamp = System.currentTimeMillis();
 	}
 	

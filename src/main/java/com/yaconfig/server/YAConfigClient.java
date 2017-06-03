@@ -23,14 +23,13 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
+import io.netty.handler.timeout.IdleStateHandler;
 
 public class YAConfigClient implements Runnable{
 	
 	private EventLoopGroup loop = new NioEventLoopGroup();
 	
-	private ExecutorService connectService;
-	
-	private ExecutorService processMsgService;
+	ExecutorService clientService;
 	
 	private ConcurrentHashMap<String,Channel> channels;
 	
@@ -38,22 +37,24 @@ public class YAConfigClient implements Runnable{
 	
 	YAMessageQueue sendToMasterQueue;
 	
-	Thread sendToMasterThread;
+	YAMessageQueue systemRcvQueue;
 	
-	Thread clientRcvMessageThread;
+	Runnable sendToMasterTask;
+	
+	Runnable clientRcvMessageTask;
 	
 	private YAConfig yaconfig;
-	
+
+	public Runnable systemRcvMessageTask;
+
 	public YAConfigClient(YAConfig yaconfig){
 		loop = new NioEventLoopGroup();
 		this.yaconfig = yaconfig;
-		//the number of endpoint is countable,use BIO read the 
-		//quorums messages.
-		connectService = Executors.newFixedThreadPool(yaconfig.quorums);
+		clientService = Executors.newCachedThreadPool();
 		channels = new ConcurrentHashMap<String,Channel>();
 		rcvQueue = new YAMessageQueue();
 		sendToMasterQueue = new YAMessageQueue();
-		processMsgService = Executors.newFixedThreadPool(yaconfig.quorums);
+		systemRcvQueue = new YAMessageQueue();
 	}
 	
 	public void connect(final String ip,final int port){
@@ -68,6 +69,8 @@ public class YAConfigClient implements Runnable{
 					ChannelPipeline p = ch.pipeline();
 					p.addLast(
 						//new LengthFieldPrepender(2),
+						 new IdleStateHandler(4,0,0,TimeUnit.SECONDS),
+						 new PeerDeadHandler(yaconfig),
 						 new ObjectEncoder(),
 						 //new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 						 new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
@@ -85,7 +88,7 @@ public class YAConfigClient implements Runnable{
 			EndPoint ep = e.getValue();
 			final String ip = ep.getIp();
 			final int port = Integer.parseInt(ep.getPort());
-			connectService.execute(new Runnable(){
+			clientService.execute(new Runnable(){
 
 				@Override
 				public void run() {
@@ -95,24 +98,37 @@ public class YAConfigClient implements Runnable{
 			});
 		}
 		
-		processMsgService.execute(new Runnable(){
+		clientRcvMessageTask = new Runnable(){
 			@Override
 			public void run(){
-				while(true){
+
 					try {
 						YAMessage yamsg = rcvQueue.take();
 						processMessage(yamsg);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
-				}
+				
 			}
-		});
+		};
 		
-		sendToMasterThread = new Thread("sendToMasterThread"){
+		systemRcvMessageTask = new Runnable(){
 			@Override
 			public void run(){
-				while(true){
+
+					try {
+						YAMessage yamsg = systemRcvQueue.take();
+						processMessage(yamsg);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				
+			}
+		};
+		
+		sendToMasterTask = new Runnable(){
+			@Override
+			public void run(){
 					
 					YAMessage yamsg = null;
 					try {
@@ -140,16 +156,9 @@ public class YAConfigClient implements Runnable{
 							}
 						}
 					}
-					try {
-						Thread.sleep(10);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
 				}
-			}
 		};
-		
-		sendToMasterThread.start();
+
 	}
 
 	public class ConnectionListener implements ChannelFutureListener {
@@ -201,11 +210,11 @@ public class YAConfigClient implements Runnable{
 		}
 
 		if(yamsg.type == YAMessage.Type.PUT){
-			if(yamsg.sequenceNum > yaconfig.VID){
+			if(yamsg.sequenceNum > YAConfig.VID){
 				promise(yamsg);
 			}else{
 				System.out.println("yamsg.sequenceNum" + yamsg.sequenceNum);
-				System.out.println("yaconfig.VID" + yaconfig.VID);
+				System.out.println("yaconfig.VID" + YAConfig.VID);
 				nack(yamsg);
 			}
 		}else if(yamsg.type == YAMessage.Type.COMMIT){
@@ -216,7 +225,7 @@ public class YAConfigClient implements Runnable{
 	}
 
 	private void learn(YAMessage yamsg) {
-		yaconfig.VID = yamsg.sequenceNum;
+		YAConfig.VID = yamsg.sequenceNum;
 		writeToStorage(yamsg);	
 	}
 
@@ -231,6 +240,7 @@ public class YAConfigClient implements Runnable{
 		yamsg.serverID = YAConfig.SERVER_ID;
 		try {
 			sendToMasterQueue.push(yamsg);
+			clientService.execute(sendToMasterTask);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -252,6 +262,7 @@ public class YAConfigClient implements Runnable{
 	public void redirectToMaster(YAMessage msg) {
 		try {
 			sendToMasterQueue.push(msg);
+			clientService.execute(sendToMasterTask);
 		} catch (InterruptedException e1) {
 			e1.printStackTrace();
 		}
@@ -260,5 +271,12 @@ public class YAConfigClient implements Runnable{
 	public void removeChannel(Channel channel) {
 		InetSocketAddress address = (InetSocketAddress)channel.remoteAddress();
 		channels.remove(address.getHostName() + ":" + String.valueOf(address.getPort()));
+	}
+
+	public void peerDead(Channel channel) {
+		InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
+		String ip = address.getHostName();
+		String port = String.valueOf(address.getPort());
+		yaconfig.peerDead(ip, port);
 	}
 }

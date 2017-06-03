@@ -14,6 +14,7 @@ public class Watchers {
 	}
 
 	public void notifyWatchers(String key,byte[] value) {
+		//TODO should use thread-safe container
 		for(Watcher w : watchers){
 			if(key.matches(w.getRexStr())){
 				w.getChangeListener().onChange(key, value);

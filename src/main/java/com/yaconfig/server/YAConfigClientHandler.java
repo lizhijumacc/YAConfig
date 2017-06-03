@@ -3,6 +3,7 @@ package com.yaconfig.server;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.EventLoop;
@@ -27,8 +28,13 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 		YAMessage yamsg = (YAMessage)msg;
 		try {
 			YAConfig.dumpPackage("client rcv a massge:",msg);
-			client.rcvQueue.push(yamsg);
-			//ctx.flush();
+			if(yamsg.key.indexOf("com.yaconsfig") != 0){
+				client.rcvQueue.push(yamsg);
+				client.clientService.execute(client.clientRcvMessageTask);
+			}/*else{
+				client.systemRcvQueue.push(yamsg);
+				client.clientService.execute(client.systemRcvMessageTask);
+			}*/
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -46,7 +52,9 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		client.removeChannel(ctx.channel());
+		Channel channel = ctx.channel();
+		client.peerDead(channel);
+		client.removeChannel(channel);
 		reconnect(ctx);
 	}
 

@@ -8,8 +8,8 @@ import com.yaconfig.commands.PutCommand;
 
 public class YAConfig{
 
-	protected static final long HEARTBEAT_INTVAL = 2000; //ms
-
+	public static final int STATUS_REPORT_INTERVAL = 2000; //ms
+	
 	private EndPointSet eps;
 	
 	private Watchers ws;
@@ -22,14 +22,11 @@ public class YAConfig{
 	
 	public volatile boolean IS_MASTER;
 	
-	private volatile int STATUS = EndPoint.Status.INIT;
+	public static volatile int STATUS = EndPoint.Status.INIT;
 	
-	private static final AtomicIntegerFieldUpdater<YAConfig> STATUS_UPDATER = 
-			AtomicIntegerFieldUpdater.newUpdater(YAConfig.class, "STATUS");
+	public static volatile String SYSTEM_PERFIX = "system";
 	
 	public static Integer quorums;
-	
-	private Thread heartbeat;
 	
 	//the max ID of YAMessage which is already commit 
 	public static volatile long VID;
@@ -68,7 +65,7 @@ public class YAConfig{
 		eps.add(new EndPoint("4249","127.0.0.1:4249"));
 		//eps.add(new EndPoint("4244","127.0.0.1:4244"));
 		
-		Watcher epWatcher = new Watcher("com.yaconfig.node..*");
+		Watcher epWatcher = new Watcher(YAConfig.SYSTEM_PERFIX + ".node..*");
 		epWatcher.setChangeListener(new IChangeListener(){
 
 			@Override
@@ -87,7 +84,7 @@ public class YAConfig{
 		});
 		ws.addWatcher(epWatcher);
 		
-		Watcher masterWatcher = new Watcher("com.yaconfig.master");
+		Watcher masterWatcher = new Watcher(YAConfig.SYSTEM_PERFIX + ".master");
 		masterWatcher.setChangeListener(new IChangeListener(){
 
 			@Override
@@ -103,25 +100,11 @@ public class YAConfig{
 		HOST = InetAddress.getLocalHost().getHostAddress() + ":" 
 					+ String.valueOf(port);
         
-        //start heartbeat
-        heartbeat = new Thread("heartbeatThread"){
-			@Override
-			public void run(){
-				for(;;){
-			        reportStatus();
-			        try {
-						Thread.sleep(HEARTBEAT_INTVAL);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-			}
-		};
 		
 		//register self
         PutCommand put = new PutCommand("put");
         put.setExecutor(exec);
-		put.execute(("com.yaconfig.node." + SERVER_ID),HOST.getBytes(),true);
+		put.execute((YAConfig.SYSTEM_PERFIX + ".node." + SERVER_ID),HOST.getBytes(),true);
 	
 		client = new YAConfigClient(this);
 		Thread clientThread = new Thread("clientThread"){
@@ -147,35 +130,20 @@ public class YAConfig{
 		serverThread.start();
 		Thread.sleep(2000);
 		clientThread.start();
-		Thread.sleep(1000);
-        heartbeat.start();
         getEps().run();
         
-  
-        Watcher test = new Watcher("com.yaconfig.test");
+        
+        Watcher test = new Watcher("com.test.test");
 		test.setChangeListener(new IChangeListener(){
 
 			@Override
 			public void onChange(String key, byte[] value) {
-				System.out.println(new String(value));
+				
 			}
 			
 		});
 		ws.addWatcher(test);
         
-        while(true){
-        	if(IS_MASTER){
-        		Thread.sleep(5000);
-	        	for(int i=0;i<10000000;i++){
-	        		PutCommand p = new PutCommand("put");
-	        		p.setExecutor(exec);
-	        		p.execute("com.yaconfig.test", "testvalue".getBytes(), false);
-	        		Thread.sleep(10);
-	        	}
-        	}
-        }
-        
-
 	}
 
 	public Watchers getWatcherSet() {
@@ -189,7 +157,7 @@ public class YAConfig{
 	public void reportStatus() {
         PutCommand changeStatus = new PutCommand("put");
         changeStatus.setExecutor(exec);
-        changeStatus.execute(("com.yaconfig.node." + SERVER_ID + ".status"),
+        changeStatus.execute((YAConfig.SYSTEM_PERFIX + ".node." + SERVER_ID + ".status"),
         		String.valueOf(STATUS).getBytes(),true);
 	}
 
@@ -235,23 +203,19 @@ public class YAConfig{
     }
 	
 	public void changeStatus(int newStatus) {
-		for(;;){
-			int oldStatus = STATUS_UPDATER.get(this);
-			if(STATUS_UPDATER.compareAndSet(this, oldStatus, newStatus)){
-				break;
-			}
+		if(STATUS != newStatus){
+			STATUS = newStatus;
+			reportStatus();
 		}
-		reportStatus();
 	}
 	
 	public boolean statusEquals(int status){
-		int myStatus = STATUS_UPDATER.get(this);
-		return myStatus == status;
+		return STATUS == status;
 	}
 
 	public static void dumpPackage(String string, Object msg) {
 		if(!msg.toString().contains("status")){
-			//System.out.println(string + msg.toString());
+			System.out.println(string + msg.toString());
 		}
 	}
 
@@ -266,4 +230,16 @@ public class YAConfig{
 		}
 		eps.setVID(serverID,sequenceNum);
 	}
+
+	public boolean isSystemMessage(String key){
+		if(key != null){
+			return key.indexOf(YAConfig.SYSTEM_PERFIX) == 0;
+		}
+		return false;
+	}
+
+	public void peerDead(String ip, String port) {
+		eps.peerDead(ip,port);
+	}
+	
 }

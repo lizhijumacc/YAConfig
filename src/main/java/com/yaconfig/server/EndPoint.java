@@ -11,8 +11,6 @@ public class EndPoint {
 	
 	private String serverId;
 	
-	public long heartbeatTimestamp;
-	
 	public String voteMaster;
 	
 	public class Status{

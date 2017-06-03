@@ -4,6 +4,9 @@ package com.yaconfig.server;
 import java.net.InetSocketAddress;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import com.yaconfig.commands.PutCommand;
 
@@ -17,6 +20,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -29,9 +33,17 @@ public class YAConfigServer implements Runnable{
 	
 	YAMessageQueue boardcastQueue;
 	
-	private UnPromisedMessages unPomisedMsgs;
+	YAMessageQueue systemMsgQueue;
 	
-	Thread boardcastThread;
+	ExecutorService serverService;
+	
+	Runnable boardcastTask;
+	
+	Runnable sendSystemMsgTask;
+	
+	Runnable bindTask;
+	
+	private UnPromisedMessages unPomisedMsgs;
 	
 	private YAConfig yaconfig;
 	
@@ -39,8 +51,10 @@ public class YAConfigServer implements Runnable{
 		this.port = port;
 		channels = new ConcurrentHashMap<String,Channel>();
 		boardcastQueue = new YAMessageQueue();
+		systemMsgQueue = new YAMessageQueue();
 		this.yaconfig = yaconfig;
 		unPomisedMsgs = new UnPromisedMessages(this);
+		serverService = Executors.newCachedThreadPool();
 	}
 	
 	public void countPromise(YAMessage msg){
@@ -49,10 +63,9 @@ public class YAConfigServer implements Runnable{
 	
 	@Override
 	public void run(){
-		boardcastThread = new Thread("boardcastThread"){
+		boardcastTask = new Runnable(){
 			@Override
 			public void run(){
-				while(true){
 					YAMessage yamsg = null;
 					try {
 						yamsg = boardcastQueue.take();
@@ -70,22 +83,55 @@ public class YAConfigServer implements Runnable{
 							channel.writeAndFlush(yamsg);
 						}
 					}
+			}
+		};
+		
+		sendSystemMsgTask = new Runnable(){
+			@Override
+			public void run(){
+					YAMessage yamsg = null;
 					try {
-						Thread.sleep(10);
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+						yamsg = systemMsgQueue.take();
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
 					}
+					
+					for(Entry<String,Channel> c :channels.entrySet()){
+						Channel channel = c.getValue();
+						if(null != channel && channel.isActive()
+								&& yamsg != null){
+							channel.writeAndFlush(yamsg);
+						}
+					}
+			}
+		};
+		
+		bindTask = new Runnable(){
+			@Override
+			public void run(){
+				doBind(port);
+			}
+		};
+		
+		Runnable clientServerBindTask = new Runnable(){
+			@Override
+			public void run(){
+				if(port == 4247){
+					doBind(8888);
 				}
 			}
 		};
 		
-		boardcastThread.start();
+		serverService.execute(bindTask);
 		
+		serverService.execute(clientServerBindTask);
+	}
+
+	public void doBind(final int bindPort){
+		ChannelFuture f;
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
-		try{
-
+		try {
 			ServerBootstrap b = new ServerBootstrap();
 			b.group(bossGroup, workerGroup)
 			 .channel(NioServerSocketChannel.class)
@@ -95,10 +141,12 @@ public class YAConfigServer implements Runnable{
 				protected void initChannel(SocketChannel ch) throws Exception {
 					ch.pipeline().addLast(
 							//new LengthFieldPrepender(2),
+							new IdleStateHandler(2,0,0,TimeUnit.SECONDS),
+							new IdleHeartbeatHandler(yaconfig),
 							new ObjectEncoder(),
 							//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 							new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-			    			new YAConfigServerHandler(yaconfig.server)
+							new YAConfigServerHandler(yaconfig.server)
 			    			);
 				}
 				 
@@ -109,25 +157,14 @@ public class YAConfigServer implements Runnable{
 			 .childOption(ChannelOption.TCP_NODELAY, true)
 			 .childOption(ChannelOption.SO_REUSEADDR, true);
 			
-			doBind(b);
-			
-		}finally{
-			workerGroup.shutdownGracefully();
-			bossGroup.shutdownGracefully();
-		}
-	}
-
-	public void doBind(ServerBootstrap b){
-		ChannelFuture f;
-		try {
-			f = b.bind(port).sync().addListener(new ChannelFutureListener(){
+			f = b.bind(bindPort).sync().addListener(new ChannelFutureListener(){
 
 				@Override
 				public void operationComplete(ChannelFuture future) throws Exception {
 					if(!future.isSuccess()){
 						System.out.println("start server error");
 					}else{
-						System.out.println("YAConfig server is started on port:" + port);
+						System.out.println("YAConfig server is started on port:" + bindPort);
 					}
 				}
 				
@@ -135,6 +172,9 @@ public class YAConfigServer implements Runnable{
 			f.channel().closeFuture().sync();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
+		} finally{
+			workerGroup.shutdownGracefully();
+			bossGroup.shutdownGracefully();
 		}
 	}
 	
@@ -149,13 +189,22 @@ public class YAConfigServer implements Runnable{
 	
 	public void broadcastToQuorums(YAMessage msg) {
 		try {
-			boardcastQueue.push(msg);
+			if(isSystemMessage(msg)){
+				systemMsgQueue.push(msg);
+				serverService.execute(sendSystemMsgTask);
+			}else{
+				boardcastQueue.push(msg);
+				serverService.execute(boardcastTask);
+			}
 		} catch (InterruptedException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 	}
 	
+	private boolean isSystemMessage(YAMessage msg) {
+		return msg.key.indexOf("com.yacondfig") == 0;
+	}
+
 	public void processMessage(YAMessage yamsg) {
 		if(yamsg.type == YAMessage.Type.PUT){
 			proposal(yamsg);
