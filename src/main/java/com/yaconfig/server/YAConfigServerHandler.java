@@ -1,5 +1,7 @@
 package com.yaconfig.server;
 
+import com.yaconfig.message.YAMessage;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 

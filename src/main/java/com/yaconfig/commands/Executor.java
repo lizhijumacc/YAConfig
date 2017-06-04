@@ -2,9 +2,9 @@ package com.yaconfig.commands;
 
 import java.io.Serializable;
 
+import com.yaconfig.message.YAMessage;
 import com.yaconfig.server.EndPoint;
 import com.yaconfig.server.YAConfig;
-import com.yaconfig.server.YAMessage;
 import com.yaconfig.storage.YAHashMap;
 
 public class Executor implements Serializable{
@@ -32,18 +32,18 @@ public class Executor implements Serializable{
 			return;
 		}
 		
-		if(yaconfig.statusEquals(EndPoint.Status.FOLLOWING)){
-			if(withoutPromise){
-				yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,0);
-			}else{
-				yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,0);
-			}
-			yaconfig.redirectToMaster(yaMessage);
+		
+		if(withoutPromise){
+			yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,0);
 		}else{
-			return;
-		}			
-		
-		
+			yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,0);
+		}
+		if(YAConfig.STATUS == EndPoint.Status.FOLLOWING){
+			yaconfig.redirectToMaster(yaMessage);
+		}else if(YAConfig.STATUS == EndPoint.Status.LEADING){
+			yaconfig.broadcastToQuorums(yaMessage);
+		}
+	
 	}
 
 	public byte[] get(String key){

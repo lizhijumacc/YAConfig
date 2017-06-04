@@ -43,14 +43,16 @@ public class EndPointSet {
 						}
 					}
 					
-					
 					//if master's heartbeat is timeout
 					for(Iterator<String> it = eps.keySet().iterator();it.hasNext();){
 						String key = it.next();
 						EndPoint ep = (EndPoint)eps.get(key);
 						
 						if(ep.status == EndPoint.Status.DEAD){
-							if(ep.equals(currentMaster)){
+							//during currentMaster is dead & I am master is not
+							//notify to others,the new master's status may change
+							//LEADING to ELECTING again.so must add needElectMaster()
+							if(ep.equals(currentMaster) && needElectMaster()){
 								electingService.execute(masterElectingTask);
 							}
 							//if next master which I am already voted is dead during election period
@@ -112,11 +114,10 @@ public class EndPointSet {
 	public void setEPStatus(String key, int status) {
 		EndPoint ep = eps.get(getServerIdFromKey(key));
 		
-		if(null != ep){
+		if(null != ep && !ep.getServerId().equals(YAConfig.SERVER_ID)){
 			synchronized(eps){
 				int preStatus = ep.status;
 				ep.status = status;
-				
 				if(preStatus != ep.status){
 					printAllStatus();
 				}
@@ -151,6 +152,7 @@ public class EndPointSet {
 			}
 		}
 		
+		
 		//if I am leading, but not get status report in this moments
 		if(leaderCount == 0 && yaconfig.IS_MASTER){
 			leaderCount++;
@@ -172,7 +174,6 @@ public class EndPointSet {
 	}
 
 	protected void reElection() {
-		
 			yaconfig.changeStatus(EndPoint.Status.ELECTING);
         	//start status barrier to wait all the other endpoint status change to ELECTING
 			//proposal the node as master which has minimum SERVER_ID
@@ -341,6 +342,17 @@ public class EndPointSet {
 						YAConfig.printImportant("CHECK EP DEAD", ep.getServerId() + " dead!");
 						System.out.println(YAConfig.VID);
 					}
+				}
+			}
+		}
+	}
+
+	public void changeMyselfStatus(int newStatus) {
+		synchronized(eps){
+			for(Entry<String,EndPoint> e : eps.entrySet()){
+				EndPoint ep = e.getValue();
+				if(ep.getServerId().equals(YAConfig.SERVER_ID)){
+					ep.status = newStatus;
 				}
 			}
 		}

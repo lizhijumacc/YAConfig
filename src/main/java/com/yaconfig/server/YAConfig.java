@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import com.yaconfig.commands.Executor;
 import com.yaconfig.commands.PutCommand;
+import com.yaconfig.message.YAMessage;
 
 public class YAConfig{
 
@@ -205,6 +206,7 @@ public class YAConfig{
 	public void changeStatus(int newStatus) {
 		if(STATUS != newStatus){
 			STATUS = newStatus;
+			eps.changeMyselfStatus(newStatus);
 			reportStatus();
 		}
 	}

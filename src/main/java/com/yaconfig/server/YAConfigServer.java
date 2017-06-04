@@ -9,6 +9,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.yaconfig.commands.PutCommand;
+import com.yaconfig.message.UnPromisedMessages;
+import com.yaconfig.message.YAMessage;
+import com.yaconfig.message.YAMessageDecoder;
+import com.yaconfig.message.YAMessageEncoder;
+import com.yaconfig.message.YAMessageQueue;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
@@ -17,6 +22,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
@@ -69,7 +76,7 @@ public class YAConfigServer implements Runnable{
 					YAMessage yamsg = null;
 					try {
 						yamsg = boardcastQueue.take();
-						if(yamsg.type == YAMessage.Type.PUT){
+						if(yamsg.getType() == YAMessage.Type.PUT){
 							unPomisedMsgs.push(yamsg);
 						}
 					} catch (InterruptedException e1) {
@@ -140,14 +147,14 @@ public class YAConfigServer implements Runnable{
 				@Override
 				protected void initChannel(SocketChannel ch) throws Exception {
 					ch.pipeline().addLast(
-							//new LengthFieldPrepender(2),
-							new IdleStateHandler(2,0,0,TimeUnit.SECONDS),
+							new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
+							new YAMessageDecoder(),
+							new IdleStateHandler(YAConfig.STATUS_REPORT_INTERVAL,0,0,TimeUnit.MILLISECONDS),
 							new IdleHeartbeatHandler(yaconfig),
-							new ObjectEncoder(),
-							//new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
-							new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-							new YAConfigServerHandler(yaconfig.server)
-			    			);
+							new YAConfigServerHandler(yaconfig.server),
+							new LengthFieldPrepender(2),
+							new YAMessageEncoder()
+			    		);
 				}
 				 
 			 })
@@ -185,6 +192,8 @@ public class YAConfigServer implements Runnable{
 		InetSocketAddress address = (InetSocketAddress)c.remoteAddress();
 		this.channels.putIfAbsent(
 				address.getHostName()+ ":" + String.valueOf(address.getPort()), c);
+		//new peer alive report myself immediately
+		yaconfig.reportStatus();
 	}
 	
 	public void broadcastToQuorums(YAMessage msg) {
@@ -202,20 +211,20 @@ public class YAConfigServer implements Runnable{
 	}
 	
 	private boolean isSystemMessage(YAMessage msg) {
-		return msg.key.indexOf("com.yacondfig") == 0;
+		return msg.getKey().indexOf(YAConfig.SYSTEM_PERFIX) == 0;
 	}
 
 	public void processMessage(YAMessage yamsg) {
-		if(yamsg.type == YAMessage.Type.PUT){
+		if(yamsg.getType() == YAMessage.Type.PUT){
 			proposal(yamsg);
-		}else if(yamsg.type == YAMessage.Type.PUT_NOPROMISE){
+		}else if(yamsg.getType() == YAMessage.Type.PUT_NOPROMISE){
 			PutCommand put = new PutCommand("put");
 			put.setExecutor(yaconfig.exec);
-			put.execute(yamsg.key,yamsg.value,true);			
-		}else if(yamsg.type == YAMessage.Type.GET){
+			put.execute(yamsg.getKey(),yamsg.getValue(),true);			
+		}else if(yamsg.getType() == YAMessage.Type.GET){
 			//TODO
 		}else if(yaconfig.statusEquals(EndPoint.Status.LEADING)
-				&& yamsg.type == YAMessage.Type.PROMISE){
+				&& yamsg.getType() == YAMessage.Type.PROMISE){
 			countPromise(yamsg);
 		}
 	}
@@ -223,7 +232,7 @@ public class YAConfigServer implements Runnable{
 	private void proposal(YAMessage yamsg) {
 		PutCommand put = new PutCommand("put");
 		put.setExecutor(yaconfig.exec);
-		put.execute(yamsg.key,yamsg.value,false);
+		put.execute(yamsg.getKey(),yamsg.getValue(),false);
 	}
 
 	public void removeChannel(Channel channel) {

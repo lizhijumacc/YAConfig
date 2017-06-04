@@ -7,6 +7,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.yaconfig.message.YAMessage;
+import com.yaconfig.message.YAMessageDecoder;
+import com.yaconfig.message.YAMessageEncoder;
+import com.yaconfig.message.YAMessageQueue;
 import com.yaconfig.storage.YAHashMap;
 
 import io.netty.bootstrap.Bootstrap;
@@ -20,9 +24,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.serialization.ClassResolvers;
-import io.netty.handler.codec.serialization.ObjectDecoder;
-import io.netty.handler.codec.serialization.ObjectEncoder;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.timeout.IdleStateHandler;
 
 public class YAConfigClient implements Runnable{
@@ -68,13 +71,14 @@ public class YAConfigClient implements Runnable{
 				public void initChannel(SocketChannel ch) throws Exception {
 					ChannelPipeline p = ch.pipeline();
 					p.addLast(
-						//new LengthFieldPrepender(2),
-						 new IdleStateHandler(4,0,0,TimeUnit.SECONDS),
+						 new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
+						 new YAMessageDecoder(),
+						 new IdleStateHandler(2 * YAConfig.STATUS_REPORT_INTERVAL,0,0,TimeUnit.MILLISECONDS),
 						 new PeerDeadHandler(yaconfig),
-						 new ObjectEncoder(),
-						 //new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
-						 new ObjectDecoder(ClassResolvers.cacheDisabled(null)),
-						 new YAConfigClientHandler(yaconfig.client));
+						 new YAConfigClientHandler(yaconfig.client),
+						 new LengthFieldPrepender(2),
+						 new YAMessageEncoder()
+						);
 			 	}
 			}).option(ChannelOption.SO_KEEPALIVE,true)
 			  .option(ChannelOption.TCP_NODELAY,true);
@@ -209,37 +213,37 @@ public class YAConfigClient implements Runnable{
 			return;
 		}
 
-		if(yamsg.type == YAMessage.Type.PUT){
-			if(yamsg.sequenceNum > YAConfig.VID){
+		if(yamsg.getType() == YAMessage.Type.PUT){
+			if(yamsg.getSequenceNum() > YAConfig.VID){
 				promise(yamsg);
 			}else{
-				System.out.println("yamsg.sequenceNum" + yamsg.sequenceNum);
+				System.out.println("yamsg.sequenceNum" + yamsg.getSequenceNum());
 				System.out.println("yaconfig.VID" + YAConfig.VID);
 				nack(yamsg);
 			}
-		}else if(yamsg.type == YAMessage.Type.COMMIT){
+		}else if(yamsg.getType() == YAMessage.Type.COMMIT){
 			learn(yamsg);
-		}else if(yamsg.type == YAMessage.Type.PUT_NOPROMISE){
+		}else if(yamsg.getType() == YAMessage.Type.PUT_NOPROMISE){
 			writeToStorage(yamsg);
 		}
 	}
 
 	private void learn(YAMessage yamsg) {
-		YAConfig.VID = yamsg.sequenceNum;
+		YAConfig.VID = yamsg.getSequenceNum();
 		writeToStorage(yamsg);	
 	}
 
 	private void writeToStorage(YAMessage yamsg) {
-		YAHashMap.getInstance().put(yamsg.key, yamsg.value);
-		yaconfig.notifyWatchers(yamsg.key, yamsg.value);
+		YAHashMap.getInstance().put(yamsg.getKey(), yamsg.getValue());
+		yaconfig.notifyWatchers(yamsg.getKey(), yamsg.getValue());
 	}
 
 	private void promise(YAMessage yamsg) {
-		YAConfig.promisedNum = yamsg.sequenceNum;
-		yamsg.type = YAMessage.Type.PROMISE;
-		yamsg.serverID = YAConfig.SERVER_ID;
+		YAConfig.promisedNum = yamsg.getSequenceNum();
+		YAMessage sendMsg = new YAMessage(yamsg.getKey(),"".getBytes(),
+				YAMessage.Type.PROMISE,yamsg.getSequenceNum());
 		try {
-			sendToMasterQueue.push(yamsg);
+			sendToMasterQueue.push(sendMsg);
 			clientService.execute(sendToMasterTask);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
