@@ -2,7 +2,7 @@ package com.yaconfig.commands;
 
 import java.io.Serializable;
 
-import com.yaconfig.message.YAMessage;
+import com.yaconfig.message.YAServerMessage;
 import com.yaconfig.server.EndPoint;
 import com.yaconfig.server.YAConfig;
 import com.yaconfig.storage.YAHashMap;
@@ -20,23 +20,23 @@ public class Executor implements Serializable{
 	}
 	
 	public void put(String key,byte[] value,boolean withoutPromise) {
-		YAMessage yaMessage;
+		YAServerMessage yaMessage;
 		
 		if(key == null){
 			return;
 		}
 		
 		if(yaconfig.isSystemMessage(key)){
-			yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,-1);
+			yaMessage = new YAServerMessage(key,value,YAServerMessage.Type.PUT_NOPROMISE,-1);
 			yaconfig.broadcastToQuorums(yaMessage);
 			return;
 		}
 		
 		
 		if(withoutPromise){
-			yaMessage = new YAMessage(key,value,YAMessage.Type.PUT_NOPROMISE,0);
+			yaMessage = new YAServerMessage(key,value,YAServerMessage.Type.PUT_NOPROMISE,0);
 		}else{
-			yaMessage = new YAMessage(key,value,YAMessage.Type.PUT,0);
+			yaMessage = new YAServerMessage(key,value,YAServerMessage.Type.PUT,yaconfig.getUnpromisedNum());
 		}
 		if(YAConfig.STATUS == EndPoint.Status.FOLLOWING){
 			yaconfig.redirectToMaster(yaMessage);

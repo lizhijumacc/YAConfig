@@ -4,21 +4,21 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.yaconfig.server.YAConfig;
-import com.yaconfig.server.YAConfigServer;
+import com.yaconfig.server.YAConfigProposer;
 
 public class UnPromisedMessages{
 	
 	ConcurrentHashMap<Long,ArrayList<String>> promise;
-	ConcurrentHashMap<Long,YAMessage> msgs; 
-	YAConfigServer server;
+	ConcurrentHashMap<Long,YAServerMessage> msgs; 
+	YAConfigProposer server;
 	
-	public UnPromisedMessages(YAConfigServer server){
+	public UnPromisedMessages(YAConfigProposer server){
 		promise = new ConcurrentHashMap<Long,ArrayList<String>>();
-		msgs = new ConcurrentHashMap<Long,YAMessage>();
+		msgs = new ConcurrentHashMap<Long,YAServerMessage>();
 		this.server = server;
 	}
 	
-	public void countPromise(YAMessage msg){
+	public void countPromise(YAServerMessage msg){
 		Long sequenceNum = msg.getSequenceNum();
 		ArrayList<String> promisedServerIDs;
 
@@ -37,8 +37,8 @@ public class UnPromisedMessages{
 			
 			//collect enough promise
 			if(promisedServerIDs.size() == YAConfig.quorums){
-				YAMessage sendMsg = new YAMessage(msg.getKey(),msg.getValue(),
-						YAMessage.Type.COMMIT,msg.getSequenceNum());
+				YAServerMessage sendMsg = new YAServerMessage(msg.getKey(),msg.getValue(),
+						YAServerMessage.Type.COMMIT,msg.getSequenceNum());
 				this.server.broadcastToQuorums(sendMsg);
 				//should setVID when committed
 				//this.server.setVID(yamsg.serverID,sequenceNum);
@@ -57,7 +57,7 @@ public class UnPromisedMessages{
 		return false;
 	}
 
-	public void push(YAMessage yamsg){
+	public void push(YAServerMessage yamsg){
 		msgs.putIfAbsent(yamsg.getSequenceNum(), yamsg);
 	}
 	

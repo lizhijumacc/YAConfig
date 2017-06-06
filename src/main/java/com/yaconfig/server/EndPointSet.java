@@ -29,6 +29,7 @@ public class EndPointSet {
 	private final Runnable masterListeningTask = new Runnable(){
 		@Override
 		public void run(){
+			
 			synchronized(eps){
 				if(hasEnoughAliveEP()){
 					//if there is no master in system or master conflict
@@ -70,7 +71,6 @@ public class EndPointSet {
 					}
 				}else{
 					yaconfig.changeStatus(EndPoint.Status.ELECTING);
-					voteNextMaster();
 				}
 			}			
 		}
@@ -257,7 +257,7 @@ public class EndPointSet {
 	        setMaster.setExecutor(yaconfig.exec);
 	        setMaster.execute(YAConfig.SYSTEM_PERFIX + ".master",YAConfig.SERVER_ID.getBytes(),true);
 			yaconfig.IS_MASTER = true;
-			YAConfig.unpromisedNum = eps.get(YAConfig.SERVER_ID).VID;
+			YAConfig.unpromisedNum.set(eps.get(YAConfig.SERVER_ID).VID);
 			yaconfig.changeStatus(EndPoint.Status.LEADING);
 		}
 		//if I am not master, set nextMaster to elected master
@@ -316,7 +316,8 @@ public class EndPointSet {
 		for(Iterator<String> it = eps.keySet().iterator();it.hasNext();){
 			String key = it.next();
 			EndPoint ep = (EndPoint)eps.get(key);
-			if(ep.status == EndPoint.Status.DEAD){
+			if(ep.status == EndPoint.Status.DEAD ||
+					ep.status == EndPoint.Status.UNKOWN){
 				countDead++;
 			}
 		}

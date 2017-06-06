@@ -8,12 +8,15 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.yaconfig.message.YAMessage;
 import com.yaconfig.message.YAMessageDecoder;
 import com.yaconfig.message.YAMessageEncoder;
-import com.yaconfig.message.YAMessageHeader;
+import com.yaconfig.message.YAServerMessage;
+import com.yaconfig.message.YAServerMessageDecoder;
+import com.yaconfig.message.YAServerMessageEncoder;
+import com.yaconfig.message.YAServerMessageHeader;
 import com.yaconfig.server.EndPoint;
 import com.yaconfig.server.PeerDeadHandler;
 import com.yaconfig.server.YAConfig;
-import com.yaconfig.server.YAConfigClientHandler;
-import com.yaconfig.server.YAConfigClient.ConnectionListener;
+import com.yaconfig.server.YAConfigMessageHandler;
+import com.yaconfig.server.YAConfigAcceptor.ConnectionListener;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -43,9 +46,7 @@ public class AppTest
 	
 	public volatile boolean stop = false;
 	
-	public static AtomicLong sendCount = new AtomicLong(0);
-	
-	public static final int count = 1000000;
+	public static volatile AtomicLong sendCount = new AtomicLong(0);
 	
 	ExecutorService service = Executors.newCachedThreadPool();
 	
@@ -53,7 +54,13 @@ public class AppTest
 	
 	public Runnable allinoneTask;
 	
-	public ChannelFuture cf;
+	public int index = 0;
+	
+	public int threadNum = 100;
+	
+	public static final int count = 1;
+	
+	public ChannelFuture[] cfs = new ChannelFuture[threadNum];
 	
     /**
      * Create the test case
@@ -64,56 +71,23 @@ public class AppTest
     {
         super( testName );
         
-        everyConnectTask = new Runnable(){
-        	@Override
-        	public void run(){
-        		
-    			YAMessage yamsg = new YAMessage("com.test.test","qqqq".getBytes(),YAMessage.Type.PUT_NOPROMISE,sendCount.get());
-    			try {
-    				System.out.println(sendCount.get());
-    				ChannelFuture f = connect();
-    				if(f.isSuccess()){
-        				AppTest.sendCount.incrementAndGet();
-        				
-        				f.channel().writeAndFlush(yamsg).sync();
-        				f.channel().close().sync();
-        				
-        				
-        				if(sendCount.get() > count){
-        					stop = true;
-        				}else{
-        					service.execute(everyConnectTask);
-        				}
-    				}
-    			} catch (InterruptedException e) {
-    				// TODO Auto-generated catch block
-    			}
-        	}
-        };
-        
         allinoneTask = new Runnable(){
         	@Override
         	public void run(){
         		
     	    	for(int i=0;i<AppTest.count;i++){
-    	    		YAMessageHeader header = new YAMessageHeader();
-    	    		header.serverID = "6666";
-    	    		header.sequenceNum = i;
-    	    		header.type = YAMessage.Type.PUT_NOPROMISE;
-    	    		header.serverStatus = EndPoint.Status.ALIVE;
     	    		
-    	    		YAMessage yamsg = new YAMessage(header,"com.test.test","qqqq".getBytes());
+    	    		YAMessage yamsg = new YAMessage(YAMessage.Type.PUT_NOPROMISE,
+    	    				"com.test.test","qqqq".getBytes());
     	    		try {
-    	    			AppTest.sendCount.incrementAndGet();
-    	    			System.out.println(sendCount.get());
-    					cf.channel().writeAndFlush(yamsg).sync();
+    	    			System.out.println(sendCount.incrementAndGet());
+    					cfs[index].channel().writeAndFlush(yamsg).sync();
     				} catch (InterruptedException e) {
     					// TODO Auto-generated catch block
     					e.printStackTrace();
     				}
     	    	}	
     	    	
-    	    	stop = true;
         	}
         };
     }
@@ -133,10 +107,12 @@ public class AppTest
     {	
     	
     	//service.execute(everyConnectTask);
-    	
-    	cf = connect();
-    	if(cf.isSuccess()){
-    		service.execute(allinoneTask);
+    	for(int i=0;i<threadNum;i++){
+    		cfs[i] = connect();
+    		index = i;
+    		if(cfs[i].isSuccess()){
+    			service.execute(allinoneTask);
+    		}
     	}
     	
 		long begin = System.currentTimeMillis() / 1000;

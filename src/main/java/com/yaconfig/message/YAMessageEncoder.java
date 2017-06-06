@@ -8,25 +8,13 @@ public class YAMessageEncoder extends MessageToByteEncoder<YAMessage>{
 
 	@Override
 	protected void encode(ChannelHandlerContext ctx, YAMessage msg, ByteBuf out) throws Exception {
-		YAMessageHeader header = msg.header;
-		
 		out.writeInt(msg.length());
-		out.writeInt(header.version);
-		out.writeInt(header.type);
-		out.writeInt(header.serverStatus);
-		out.writeLong(header.sequenceNum);
-		byte[] serverID = header.serverID.getBytes();
-		out.writeInt(serverID.length);
-		out.writeBytes(serverID);
-		
-		byte[] key = msg.key.getBytes();
-		out.writeInt(key.length);
-		out.writeBytes(key);
-		
-		byte[] value = msg.value;
-		out.writeInt(value.length);
-		out.writeBytes(value);
-
+		out.writeInt(msg.header.type);
+		out.writeInt(msg.header.version);
+		out.writeInt(msg.getKey().getBytes().length);
+		out.writeBytes(msg.getKey().getBytes());
+		out.writeInt(msg.getValue().length);
+		out.writeBytes(msg.getValue());
 	}
 
 }

@@ -1,11 +1,11 @@
 package com.yaconfig.server;
 
 import java.net.InetAddress;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.yaconfig.commands.Executor;
 import com.yaconfig.commands.PutCommand;
-import com.yaconfig.message.YAMessage;
+import com.yaconfig.message.YAServerMessage;
 
 public class YAConfig{
 
@@ -30,16 +30,18 @@ public class YAConfig{
 	public static Integer quorums;
 	
 	//the max ID of YAMessage which is already commit 
-	public static volatile long VID;
+	public static volatile AtomicLong VID;
 	
 	//the max ID of YAMessage which is already promised by Acceptors but not commit yet 
-	public static volatile long promisedNum;
+	public static volatile AtomicLong promisedNum;
 	
 	//the max ID of YAMessage which is wait for Acceptors promise
 	//in a moment: VID < promisedNum < unpromisedNum
-	public static volatile long unpromisedNum;
+	public static volatile AtomicLong unpromisedNum;
 	
-	public YAConfigClient client;
+	public YAConfigAcceptor acceptor;
+	
+	public YAConfigProposer proposer;
 	
 	public YAConfigServer server;
 	
@@ -51,9 +53,9 @@ public class YAConfig{
 		
 		ws = new Watchers();
 		
-		VID = 0;
-		promisedNum = -1;
-		unpromisedNum = 0;
+		VID = new AtomicLong(0);
+		promisedNum = new AtomicLong(-1);
+		unpromisedNum = new AtomicLong(0);
 		
 		IS_MASTER = false;
 		
@@ -101,36 +103,46 @@ public class YAConfig{
 		HOST = InetAddress.getLocalHost().getHostAddress() + ":" 
 					+ String.valueOf(port);
         
-		
-		//register self
-        PutCommand put = new PutCommand("put");
-        put.setExecutor(exec);
-		put.execute((YAConfig.SYSTEM_PERFIX + ".node." + SERVER_ID),HOST.getBytes(),true);
-	
-		client = new YAConfigClient(this);
-		Thread clientThread = new Thread("clientThread"){
+
+		acceptor = new YAConfigAcceptor(this);
+		Thread acceptorThread = new Thread("acceptorThread"){
 			@Override
 			public void run(){
-				client.run();
+				acceptor.run();
 			}
 		};
 		
-		server = new YAConfigServer(port,this);
-		Thread serverThread = new Thread("serverThread"){
+		proposer = new YAConfigProposer(port,this);
+		Thread proposerThread = new Thread("proposerThread"){
 			@Override
 			public void run(){
 				try {
-					server.run();
+					proposer.run();
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
 		};
 		
+		if(port == 4247){
+			server = new YAConfigServer();
+			Thread serverThread = new Thread("proposerThread"){
+				@Override
+				public void run(){
+					try {
+						server.run();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			};
+			
+			serverThread.start();
+		}
 		
-		serverThread.start();
+		proposerThread.start();
 		Thread.sleep(2000);
-		clientThread.start();
+		acceptorThread.start();
         getEps().run();
         
         
@@ -170,14 +182,14 @@ public class YAConfig{
 		this.eps = eps;
 	}
 
-	public void broadcastToQuorums(YAMessage msg) {
-		if(server != null){
-			server.broadcastToQuorums(msg);
+	public void broadcastToQuorums(YAServerMessage msg) {
+		if(proposer != null){
+			proposer.broadcastToQuorums(msg);
 		}
 	}
 
-	public void redirectToMaster(YAMessage msg) {
-		client.redirectToMaster(msg);
+	public void redirectToMaster(YAServerMessage msg) {
+		acceptor.redirectToMaster(msg);
 	}
 	
     public static void main( String[] args ) throws Exception{
@@ -221,14 +233,13 @@ public class YAConfig{
 		}
 	}
 
-	public synchronized long getUnpromisedNum() {
-		unpromisedNum++;
-		return unpromisedNum;
+	public long getUnpromisedNum() {
+		return unpromisedNum.incrementAndGet();
 	}
 
 	public void setVID(String serverID, Long sequenceNum) {
 		if(serverID == SERVER_ID){
-			VID = sequenceNum;
+			VID.set(sequenceNum);
 		}
 		eps.setVID(serverID,sequenceNum);
 	}

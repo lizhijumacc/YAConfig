@@ -10,40 +10,22 @@ public class YAMessageDecoder extends ByteToMessageDecoder{
 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-		
 		int length = in.readInt();
-		int version = in.readInt();
 		int type = in.readInt();
-		int serverStatus = in.readInt();
-		long sequenceNum = in.readLong();
-		String serverID = readString(in);
+		int version = in.readInt();
+		int keyLength = in.readInt();
+		byte[] keyBytes = new byte[keyLength];
+		in.readBytes(keyBytes);
 		
-		YAMessageHeader header = new YAMessageHeader();
-		header.version = version;
-		header.type = type;
-		header.serverStatus = serverStatus;
-		header.sequenceNum = sequenceNum;
-		header.serverID = serverID;
+		int valueLength = in.readInt();
+		byte[] valueBytes = new byte[valueLength];
+		in.readBytes(valueBytes);
 		
-		String key = readString(in);
-		byte[] value = readByte(in);
+		YAMessage msg = new YAMessage(type,new String(keyBytes),valueBytes);
+		msg.header.version = version;
 		
-		YAMessage yamsg = new YAMessage(header,key,value);
-		out.add(yamsg);
+		out.add(msg);
 		
-	}
-	
-	protected byte[] readByte(ByteBuf in){
-		int length = in.readInt();
-		byte[] b = new byte[length];
-		in.readBytes(b);
-		
-		return b;
-	}
-	
-	protected String readString(ByteBuf in){
-		byte[] b = readByte(in);
-		return new String(b);
 	}
 
 }

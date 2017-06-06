@@ -4,17 +4,17 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class YAMessageQueue {
-	BlockingQueue<YAMessage> queue;
+	BlockingQueue<Object> queue;
 	
 	public YAMessageQueue(){
-		queue = new LinkedBlockingQueue<YAMessage>();
+		queue = new LinkedBlockingQueue<Object>();
 	}
 	
-	public void push(YAMessage msg) throws InterruptedException{
+	public void push(Object msg) throws InterruptedException{
 		queue.put(msg);
 	}
 	
-	public YAMessage take() throws InterruptedException{
+	public Object take() throws InterruptedException{
 		return queue.take();
 	}
 	
