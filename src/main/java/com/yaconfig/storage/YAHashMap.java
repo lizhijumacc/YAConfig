@@ -31,4 +31,8 @@ public class YAHashMap implements IStorage{
 	public byte[] get(String key) {
 		return (byte[]) map.get(key);
 	}
+	
+	public boolean contains(String key){
+		return map.containsKey(key);
+	}
 }

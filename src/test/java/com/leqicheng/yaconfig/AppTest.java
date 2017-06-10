@@ -56,11 +56,13 @@ public class AppTest
 	
 	public int index = 0;
 	
-	public int threadNum = 100;
+	public int threadNum = 1;
 	
 	public static final int count = 1;
 	
 	public ChannelFuture[] cfs = new ChannelFuture[threadNum];
+	
+	public ChannelFuture watcherCF;
 	
     /**
      * Create the test case
@@ -102,23 +104,40 @@ public class AppTest
 
     /**
      * Rigourous Test :-)
+     * @throws InterruptedException 
      */
-    public void testApp()
+    public void testApp() throws InterruptedException
     {	
     	
     	//service.execute(everyConnectTask);
-    	for(int i=0;i<threadNum;i++){
-    		cfs[i] = connect();
-    		index = i;
-    		if(cfs[i].isSuccess()){
-    			service.execute(allinoneTask);
-    		}
+    	
+    	watcherCF = connect();
+    	
+    	if(watcherCF.isSuccess()){
+    		System.out.println("??????");
+    		YAMessage msg = new YAMessage(YAMessage.Type.WATCH,"com.test.test","".getBytes());
+    		watcherCF.channel().writeAndFlush(msg);
+    		
+    		Thread.sleep(2000);
+    		
+        	for(int i=0;i<threadNum;i++){
+        		cfs[i] = connect();
+        		index = i;
+        		if(cfs[i].isSuccess()){
+        			service.execute(allinoneTask);
+        		}
+        	}
     	}
     	
 		long begin = System.currentTimeMillis() / 1000;
 
 		while(true){
-			
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 
 		//long end = System.currentTimeMillis() / 1000;
@@ -138,6 +157,7 @@ public class AppTest
 				p.addLast(
 							 new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 							 new YAMessageDecoder(),
+							 new YAConfigTestClientHandler(myself),
 							 new LengthFieldPrepender(2),
 							 new YAMessageEncoder()
 						 );

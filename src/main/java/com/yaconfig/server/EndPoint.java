@@ -1,5 +1,7 @@
 package com.yaconfig.server;
 
+import io.netty.channel.ChannelId;
+
 public class EndPoint {
 	
 	//the current replica version ID in this endpoint
@@ -12,6 +14,8 @@ public class EndPoint {
 	private String serverId;
 	
 	public String voteMaster;
+	
+	public ChannelId channelId;
 	
 	public class Status{
 		public static final int ALIVE = 0;
@@ -46,6 +50,14 @@ public class EndPoint {
 
 	public void setPort(String port) {
 		this.port = port;
+	}
+	
+	public ChannelId getChannelId(){
+		return this.channelId;
+	}
+	
+	public void setChannelId(ChannelId id){
+		this.channelId = id;
 	}
 	
 	@Override

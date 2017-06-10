@@ -8,6 +8,11 @@ public class YAMessage {
 		public static final int GET_LOCAL = 3;
 		public static final int WATCH = 4;
 		public static final int UNWATCH = 5;
+		
+		//events
+		public static final int ADD = 6;
+		public static final int DELETE = 7;
+		public static final int UPDATE = 8;
 	}
 	
 	public YAMessageHeader header;
@@ -49,6 +54,6 @@ public class YAMessage {
 	
 	@Override
 	public String toString(){
-		return "Type:" + this.header.type + "KEY:" + new String(this.key) + " VALUE:" + this.value;
+		return "Type:" + this.header.type + "KEY:" + new String(this.key) + " VALUE:" + new String(this.value);
 	}
 }

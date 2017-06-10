@@ -7,6 +7,8 @@ import com.yaconfig.commands.Executor;
 import com.yaconfig.commands.PutCommand;
 import com.yaconfig.message.YAServerMessage;
 
+import io.netty.channel.ChannelId;
+
 public class YAConfig{
 
 	public static final int STATUS_REPORT_INTERVAL = 2000; //ms
@@ -72,7 +74,7 @@ public class YAConfig{
 		epWatcher.setChangeListener(new IChangeListener(){
 
 			@Override
-			public void onChange(String key,byte[] value) {
+			public void onChange(String key,byte[] value,int type) {
 				String suffix = key.substring(key.lastIndexOf(".") + 1);
 				
 				switch (suffix) {
@@ -91,7 +93,7 @@ public class YAConfig{
 		masterWatcher.setChangeListener(new IChangeListener(){
 
 			@Override
-			public void onChange(String key, byte[] value) {
+			public void onChange(String key, byte[] value,int type) {
 				String masterId = new String(value);
 				getEps().setCurrentMaster(masterId);
 			}
@@ -125,7 +127,7 @@ public class YAConfig{
 		};
 		
 		if(port == 4247){
-			server = new YAConfigServer();
+			server = new YAConfigServer(this);
 			Thread serverThread = new Thread("proposerThread"){
 				@Override
 				public void run(){
@@ -150,7 +152,7 @@ public class YAConfig{
 		test.setChangeListener(new IChangeListener(){
 
 			@Override
-			public void onChange(String key, byte[] value) {
+			public void onChange(String key, byte[] value, int type) {
 				
 			}
 			
@@ -163,8 +165,8 @@ public class YAConfig{
 		return ws;
 	}
 	
-	public void notifyWatchers(String key,byte[] value){
-		ws.notifyWatchers(key,value);
+	public void notifyWatchers(String key,byte[] value, int type){
+		ws.notifyWatchers(key,value,type);
 	}
 
 	public void reportStatus() {
@@ -217,6 +219,16 @@ public class YAConfig{
 	
 	public void changeStatus(int newStatus) {
 		if(STATUS != newStatus){
+			
+			/*StringBuilder sb=new StringBuilder("");  
+		    Exception e = new Exception("print stack");  
+		      StackTraceElement[] trace = e.getStackTrace();;  
+		      for (int i=0; i < trace.length; i++)  
+		        sb.append("\tat " + trace[i]);  
+		    
+			
+			System.out.println("I change to" + newStatus);
+			System.out.println("who invoke me\n"+sb.toString());*/ 
 			STATUS = newStatus;
 			eps.changeMyselfStatus(newStatus);
 			reportStatus();
@@ -253,6 +265,10 @@ public class YAConfig{
 
 	public void peerDead(String ip, String port) {
 		eps.peerDead(ip,port);
+	}
+
+	public void setChannelId(String ip, int port,ChannelId id) {
+		eps.setChannelId(ip,port,id);
 	}
 	
 }

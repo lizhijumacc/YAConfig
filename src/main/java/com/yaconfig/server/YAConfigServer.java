@@ -1,12 +1,17 @@
 package com.yaconfig.server;
 
+import com.yaconfig.commands.PutCommand;
 import com.yaconfig.message.YAMessage;
 import com.yaconfig.message.YAMessageDecoder;
 import com.yaconfig.message.YAMessageEncoder;
+import com.yaconfig.message.YAMessageWrapper;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -18,8 +23,10 @@ import io.netty.handler.codec.LengthFieldPrepender;
 
 public class YAConfigServer extends MessageProcessor implements Runnable{
 
-	public YAConfigServer(){
-		
+	YAConfig yaconfig;
+	
+	public YAConfigServer(YAConfig yaconfig){
+		this.yaconfig = yaconfig;
 	}
 	
 	@Override
@@ -63,7 +70,8 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 			 .option(ChannelOption.SO_REUSEADDR, true)
 			 .childOption(ChannelOption.TCP_NODELAY, true)
 			 .childOption(ChannelOption.SO_KEEPALIVE, true)
-			 .childOption(ChannelOption.SO_REUSEADDR, true);
+			 .childOption(ChannelOption.SO_REUSEADDR, true)
+			 .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
 			
 			f = b.bind(bindPort).sync().addListener(new ChannelFutureListener(){
 
@@ -90,20 +98,50 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 
 	@Override
 	public void processMessageImpl(Object msg) {
-		YAMessage yamsg = (YAMessage)msg;
+		YAMessageWrapper yamsgw = (YAMessageWrapper)msg;
+		ChannelHandlerContext ctx = yamsgw.ctx;
+		YAMessage yamsg = yamsgw.msg;
+
 		if(yamsg.getType() == YAMessage.Type.PUT){
-			System.out.println("putputputputputputput");
+			PutCommand put = new PutCommand("put");
+			put.setExecutor(yaconfig.exec);
+			put.execute(yamsg.getKey(), yamsg.getValue(), false);
 		}else if(yamsg.getType() == YAMessage.Type.PUT_NOPROMISE){
-			System.out.println("putputputpunononotputputput");
+			PutCommand put = new PutCommand("put");
+			put.setExecutor(yaconfig.exec);
+			put.execute(yamsg.getKey(), yamsg.getValue(), true);
 		}else if(yamsg.getType() == YAMessage.Type.GET){
 			
 		}else if(yamsg.getType() == YAMessage.Type.GET_LOCAL){
 			
 		}else if(yamsg.getType() == YAMessage.Type.WATCH){
+			final Watcher watcher = new Watcher(yamsg.key);
+			watcher.setChannelId(ctx.channel().id());
 			
+			watcher.setChangeListener(new IChangeListener(){
+
+				@Override
+				public void onChange(String key,byte[] value,int type) {
+					
+					Channel channel = yaconfig.server.getChannel(watcher.getChannelId());
+					
+					if(channel != null && channel.isActive()){
+						YAMessage yamsg = new YAMessage(type,key,value);
+						yaconfig.server.produce(yamsg, channel.id());
+					}
+				}
+				
+			});
+			yaconfig.getWatcherSet().addWatcher(watcher);
 		}else if(yamsg.getType() == YAMessage.Type.UNWATCH){
-			
+			yaconfig.getWatcherSet().removeWatcher(yamsg.key,ctx.channel().id());
 		}
+	}
+	
+	@Override
+	public void channelInactive(Channel channel){
+		yaconfig.getWatcherSet().removeWatcher(channel.id());
+		super.channelInactive(channel);
 	}
 
 }

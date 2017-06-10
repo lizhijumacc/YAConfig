@@ -4,9 +4,11 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.yaconfig.message.YAMessage;
 import com.yaconfig.message.YAMessageQueue;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelId;
 
 public abstract class MessageProcessor extends ChannelContainer implements MessageProducer,MessageConsumer{
 	ExecutorService processService;
@@ -49,9 +51,9 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 		}
 	}
 	
-	public void produce(Object msg,final String host){
+	public void produce(Object msg,final ChannelId id){
 		
-		if(host == null || msg == null){
+		if(id == null || msg == null){
 			return;
 		}
 		
@@ -64,18 +66,11 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 					try {
 						Object sendMsg = sendQueue.take();
 						
-						for(Entry<String,Channel> ep: channels.entrySet()){
-							Channel channel = ep.getValue();
-							String key = ep.getKey();
-							
-							if(key.equals(host) && channel.isActive()){
-								try {
-									channel.writeAndFlush(sendMsg).sync();
-									break;
-								} catch (InterruptedException e) {
-									e.printStackTrace();
-								}
-							}
+						Channel channel = channels.get(id);
+						if(channel != null && channel.isWritable() && channel.isActive()){
+							channel.writeAndFlush(sendMsg);
+						}else{
+							sendQueue.push(sendMsg);
 						}
 					} catch (InterruptedException e) {
 						e.printStackTrace();
@@ -100,10 +95,11 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 					try {
 						Object yamsg = boardcastQueue.take();
 						
-						
 						for(Channel channel : channels.values()){
-							if(channel.isActive()){
-								channel.writeAndFlush(yamsg).sync();
+							if(channel.isWritable() && channel.isActive()){
+								channel.writeAndFlush(yamsg);
+							}else{
+								boardcastQueue.push(yamsg);
 							}
 						}
 					} catch (InterruptedException e) {

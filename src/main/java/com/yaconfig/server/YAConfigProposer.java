@@ -9,6 +9,7 @@ import com.yaconfig.message.YAServerMessageDecoder;
 import com.yaconfig.message.YAServerMessageEncoder;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -85,7 +86,8 @@ public class YAConfigProposer extends MessageProcessor implements Runnable{
 			 .option(ChannelOption.SO_REUSEADDR, true)
 			 .childOption(ChannelOption.SO_KEEPALIVE, true)
 			 .childOption(ChannelOption.TCP_NODELAY, true)
-			 .childOption(ChannelOption.SO_REUSEADDR, true);
+			 .childOption(ChannelOption.SO_REUSEADDR, true)
+			 .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
 			
 			f = b.bind(bindPort).sync().addListener(new ChannelFutureListener(){
 

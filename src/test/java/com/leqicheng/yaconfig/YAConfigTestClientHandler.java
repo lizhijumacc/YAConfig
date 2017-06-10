@@ -1,5 +1,7 @@
 package com.leqicheng.yaconfig;
 
+import com.yaconfig.message.YAMessage;
+import com.yaconfig.message.YAMessageWrapper;
 import com.yaconfig.message.YAServerMessage;
 
 import io.netty.channel.Channel;
@@ -24,6 +26,12 @@ public class YAConfigTestClientHandler extends ChannelInboundHandlerAdapter {
 	public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
 		// TODO Auto-generated method stub
 
+	}
+	
+	@Override
+	public void channelRead(ChannelHandlerContext ctx,Object msg){
+		YAMessageWrapper yamsg = (YAMessageWrapper)msg;
+		System.out.println(yamsg.msg);
 	}
 
 	@Override

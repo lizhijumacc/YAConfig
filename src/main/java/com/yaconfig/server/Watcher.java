@@ -1,9 +1,13 @@
 package com.yaconfig.server;
 
+import io.netty.channel.ChannelId;
+
 public class Watcher {
 	private String rexStr;
 	
 	private IChangeListener changeListener;
+	
+	public ChannelId channelId;
 
 	public Watcher(String rex){
 		this.rexStr = rex;
@@ -23,5 +27,13 @@ public class Watcher {
 	
 	public IChangeListener getChangeListener(){
 		return changeListener;
+	}
+	
+	public ChannelId getChannelId(){
+		return channelId;
+	}
+	
+	public void setChannelId(ChannelId id){
+		this.channelId = id;
 	}
 }

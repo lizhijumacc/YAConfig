@@ -14,7 +14,7 @@ public class YAConfigMessageHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelActive(ChannelHandlerContext ctx){
-		processor.addChannel(ctx.channel());
+		processor.channelActive(ctx.channel());
 	}
 	
 	@Override

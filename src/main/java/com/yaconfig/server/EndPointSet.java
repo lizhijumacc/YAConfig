@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.yaconfig.commands.PutCommand;
 
+import io.netty.channel.ChannelId;
+
 public class EndPointSet {
 	public ConcurrentHashMap<String, EndPoint> eps;
 	
@@ -194,14 +196,14 @@ public class EndPointSet {
 				}
 			}
 			
-			
-	        //if the old leader is fake dead(because of networking jitter) in this waiting period,
-	        //the condition may never be achieved,so break the forever loop when old leader online again.
-			if(notwatingeps.contains(currentMaster)
+			//DEPRECATE: if the old leader is fake dead,make it true dead & trigger the next round of election.
+	        ///if the old leader is fake dead(because of networking jitter) in this waiting period,
+	        ///the condition may never be achieved,so break the forever loop when old leader online again.
+			/*if(notwatingeps.contains(currentMaster)
 					&& currentMaster.status == EndPoint.Status.LEADING
 					&& !yaconfig.IS_MASTER){
 				yaconfig.changeStatus(EndPoint.Status.FOLLOWING);
-			}
+			}*/
 			
 			//if all the endpoint is waiting for new leader
 			if(notwatingeps.size() == 0 && deadCount < resolutionThreshold){
@@ -342,6 +344,7 @@ public class EndPointSet {
 						ep.status = EndPoint.Status.DEAD;
 						YAConfig.printImportant("CHECK EP DEAD", ep.getServerId() + " dead!");
 						System.out.println(YAConfig.VID);
+						ep.channelId = null;
 					}
 				}
 			}
@@ -354,6 +357,18 @@ public class EndPointSet {
 				EndPoint ep = e.getValue();
 				if(ep.getServerId().equals(YAConfig.SERVER_ID)){
 					ep.status = newStatus;
+				}
+			}
+		}
+	}
+
+	public void setChannelId(String ip, int port, ChannelId id) {
+		synchronized(eps){
+			for(Entry<String,EndPoint> e : eps.entrySet()){
+				EndPoint ep = e.getValue();
+				if(ep.getPort().equals(String.valueOf(port))
+						&& ep.getIp().equals(ip)){
+					ep.setChannelId(id);
 				}
 			}
 		}

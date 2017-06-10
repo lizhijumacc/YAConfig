@@ -4,12 +4,14 @@ import java.net.InetSocketAddress;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
+import com.yaconfig.message.YAMessage;
 import com.yaconfig.message.YAServerMessage;
 import com.yaconfig.message.YAServerMessageDecoder;
 import com.yaconfig.message.YAServerMessageEncoder;
 import com.yaconfig.storage.YAHashMap;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -50,16 +52,16 @@ public class YAConfigAcceptor extends MessageProcessor implements Runnable{
 						 new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
 						 new YAServerMessageDecoder(),
 						 new IdleStateHandler(2 * YAConfig.STATUS_REPORT_INTERVAL,0,0,TimeUnit.MILLISECONDS),
-						 new PeerDeadHandler(yaconfig),
+						 new PeerDeadHandler(yaconfig,yaconfig.acceptor),
 						 new YAConfigMessageHandler(yaconfig.acceptor),
 						 new LengthFieldPrepender(2),
 						 new YAServerMessageEncoder()
 						);
 			 	}
 			}).option(ChannelOption.SO_KEEPALIVE,true)
-			  .option(ChannelOption.TCP_NODELAY,true);
-		bootstrap.connect(ip,port).awaitUninterruptibly()
-				.addListener(new ConnectionListener(this,ip,port));		
+			  .option(ChannelOption.TCP_NODELAY,true)
+			  .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
+		bootstrap.connect(ip,port).addListener(new ConnectionListener(this,ip,port));		
 	}
 
 	@Override
@@ -138,15 +140,19 @@ public class YAConfigAcceptor extends MessageProcessor implements Runnable{
 	}
 
 	private void writeToStorage(YAServerMessage yamsg) {
+		int type = YAMessage.Type.ADD;
+		if(YAHashMap.getInstance().contains(yamsg.getKey())){
+			type = YAMessage.Type.UPDATE;
+		}
 		YAHashMap.getInstance().put(yamsg.getKey(), yamsg.getValue());
-		yaconfig.notifyWatchers(yamsg.getKey(), yamsg.getValue());
+		yaconfig.notifyWatchers(yamsg.getKey(), yamsg.getValue(),type);
 	}
 
 	private void promise(YAServerMessage yamsg) {
 		YAConfig.promisedNum.set(yamsg.getSequenceNum());
 		YAServerMessage sendMsg = new YAServerMessage(yamsg.getKey(),"".getBytes(),
 				YAServerMessage.Type.PROMISE,yamsg.getSequenceNum());
-		produce(sendMsg,yaconfig.getEps().currentMaster.host());
+		produce(sendMsg,yaconfig.getEps().currentMaster.getChannelId());
 	}
 	
 	private void nack(YAServerMessage yamsg){
@@ -163,7 +169,7 @@ public class YAConfigAcceptor extends MessageProcessor implements Runnable{
 	}
 
 	public void redirectToMaster(YAServerMessage msg) {
-		produce(msg,yaconfig.getEps().currentMaster.host());
+		produce(msg,yaconfig.getEps().currentMaster.getChannelId());
 	}
 
 	public void peerDead(Channel channel) {
@@ -205,6 +211,17 @@ public class YAConfigAcceptor extends MessageProcessor implements Runnable{
 			}
 			
 		}, 1L, TimeUnit.SECONDS);	
+	}
+	
+	@Override
+	public void channelActive(Channel channel){
+		InetSocketAddress address = (InetSocketAddress) channel.remoteAddress();
+		int port = address.getPort();
+		String ip = address.getHostName();
+		
+		yaconfig.setChannelId(ip,port,channel.id());
+		
+		super.channelActive(channel);
 	}
 
 }

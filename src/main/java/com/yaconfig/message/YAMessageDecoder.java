@@ -24,7 +24,11 @@ public class YAMessageDecoder extends ByteToMessageDecoder{
 		YAMessage msg = new YAMessage(type,new String(keyBytes),valueBytes);
 		msg.header.version = version;
 		
-		out.add(msg);
+		YAMessageWrapper msgw = new YAMessageWrapper();
+		msgw.ctx = ctx;
+		msgw.msg = msg;
+
+		out.add(msgw);
 		
 	}
 

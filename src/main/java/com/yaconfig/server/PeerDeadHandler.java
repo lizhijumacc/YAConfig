@@ -10,7 +10,9 @@ public class PeerDeadHandler extends ChannelInboundHandlerAdapter {
 
 	public YAConfig yaconfig;
 	
-	public PeerDeadHandler(YAConfig yaconfig){
+	public ChannelContainer channels;
+	
+	public PeerDeadHandler(YAConfig yaconfig,ChannelContainer channels){
 		this.yaconfig = yaconfig;
 	}
 	
@@ -20,8 +22,8 @@ public class PeerDeadHandler extends ChannelInboundHandlerAdapter {
 			InetSocketAddress address = (InetSocketAddress) ctx.channel().remoteAddress();
 			String ip = address.getHostName();
 			String port = String.valueOf(address.getPort());
-			System.out.println("idle!!!!!!!!!dead");
 			yaconfig.peerDead(ip,port);
+			channels.removeChannel(ctx.channel());
 		}
 		super.userEventTriggered(ctx, evt);
 	}

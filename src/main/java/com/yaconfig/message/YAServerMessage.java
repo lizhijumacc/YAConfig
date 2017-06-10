@@ -35,6 +35,21 @@ public class YAServerMessage {
 		this.value = value;
 	}
 	
+	public YAServerMessage(YAMessage yamsg,long sequenceNum) throws ClassCastException{
+		this.key = yamsg.key;
+		this.value = yamsg.value;
+		this.header = new YAServerMessageHeader();
+		if(yamsg.getType() < 4){
+			this.header.type = yamsg.getType();
+		}else{
+			throw new ClassCastException("type is not compatable.");
+		}
+		
+		this.header.sequenceNum = sequenceNum;
+		this.header.serverID = YAConfig.SERVER_ID;
+		this.header.serverStatus = YAConfig.STATUS;
+	}
+	
 	public int getType(){
 		return header.type;
 	}
