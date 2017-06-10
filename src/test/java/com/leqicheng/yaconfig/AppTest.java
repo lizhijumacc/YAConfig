@@ -114,8 +114,7 @@ public class AppTest
     	watcherCF = connect();
     	
     	if(watcherCF.isSuccess()){
-    		System.out.println("??????");
-    		YAMessage msg = new YAMessage(YAMessage.Type.WATCH,"com.test.test","".getBytes());
+    		YAMessage msg = new YAMessage(YAMessage.Type.WATCH,"system.*","".getBytes());
     		watcherCF.channel().writeAndFlush(msg);
     		
     		Thread.sleep(2000);

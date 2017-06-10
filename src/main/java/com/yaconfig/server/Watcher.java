@@ -13,6 +13,11 @@ public class Watcher {
 		this.rexStr = rex;
 	}
 	
+	public Watcher(String rex,ChannelId id){
+		this.rexStr = rex;
+		this.channelId = id;
+	}
+	
 	public String getRexStr() {
 		return rexStr;
 	}
@@ -35,5 +40,25 @@ public class Watcher {
 	
 	public void setChannelId(ChannelId id){
 		this.channelId = id;
+	}
+	
+	@Override
+	public int hashCode(){
+		if(channelId != null){
+			return channelId.hashCode() + rexStr.hashCode();
+		}
+		return rexStr.hashCode();
+	}
+	
+	@Override
+	public boolean equals(Object other){
+		if(!(other instanceof EndPoint)){
+			return false;
+		}
+		if(other == this){
+			return true;
+		}
+		
+		return ((Watcher)other).channelId == this.channelId && rexStr.equals(((Watcher)other).rexStr);
 	}
 }
