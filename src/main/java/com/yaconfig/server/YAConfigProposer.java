@@ -2,11 +2,10 @@ package com.yaconfig.server;
 
 import java.util.concurrent.TimeUnit;
 
-import com.yaconfig.commands.PutCommand;
-import com.yaconfig.message.UnPromisedMessages;
-import com.yaconfig.message.YAServerMessage;
-import com.yaconfig.message.YAServerMessageDecoder;
-import com.yaconfig.message.YAServerMessageEncoder;
+import com.yaconfig.server.commands.PutCommand;
+import com.yaconfig.server.message.YAServerMessage;
+import com.yaconfig.server.message.YAServerMessageDecoder;
+import com.yaconfig.server.message.YAServerMessageEncoder;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;

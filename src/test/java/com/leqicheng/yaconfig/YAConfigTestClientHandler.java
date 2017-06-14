@@ -1,8 +1,8 @@
 package com.leqicheng.yaconfig;
 
-import com.yaconfig.message.YAMessage;
-import com.yaconfig.message.YAMessageWrapper;
-import com.yaconfig.message.YAServerMessage;
+import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.client.message.YAMessageWrapper;
+import com.yaconfig.server.message.YAServerMessage;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;

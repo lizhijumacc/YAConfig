@@ -4,11 +4,11 @@ import java.net.InetSocketAddress;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
-import com.yaconfig.message.YAMessage;
-import com.yaconfig.message.YAServerMessage;
-import com.yaconfig.message.YAServerMessageDecoder;
-import com.yaconfig.message.YAServerMessageEncoder;
-import com.yaconfig.storage.YAHashMap;
+import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.server.message.YAServerMessage;
+import com.yaconfig.server.message.YAServerMessageDecoder;
+import com.yaconfig.server.message.YAServerMessageEncoder;
+import com.yaconfig.server.storage.YAHashMap;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.PooledByteBufAllocator;

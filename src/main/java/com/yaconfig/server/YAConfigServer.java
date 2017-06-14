@@ -1,10 +1,10 @@
 package com.yaconfig.server;
 
-import com.yaconfig.commands.PutCommand;
-import com.yaconfig.message.YAMessage;
-import com.yaconfig.message.YAMessageDecoder;
-import com.yaconfig.message.YAMessageEncoder;
-import com.yaconfig.message.YAMessageWrapper;
+import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.client.message.YAMessageDecoder;
+import com.yaconfig.client.message.YAMessageEncoder;
+import com.yaconfig.client.message.YAMessageWrapper;
+import com.yaconfig.server.commands.PutCommand;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -115,7 +115,7 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 		}else if(yamsg.getType() == YAMessage.Type.GET_LOCAL){
 			
 		}else if(yamsg.getType() == YAMessage.Type.WATCH){
-			final Watcher watcher = new Watcher(yamsg.key);
+			final ServerWatcher watcher = new ServerWatcher(yamsg.key);
 			watcher.setChannelId(ctx.channel().id());
 			
 			watcher.setChangeListener(new IChangeListener(){

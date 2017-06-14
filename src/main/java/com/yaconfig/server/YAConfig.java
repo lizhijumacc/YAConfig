@@ -3,9 +3,9 @@ package com.yaconfig.server;
 import java.net.InetAddress;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.yaconfig.commands.Executor;
-import com.yaconfig.commands.PutCommand;
-import com.yaconfig.message.YAServerMessage;
+import com.yaconfig.server.commands.Executor;
+import com.yaconfig.server.commands.PutCommand;
+import com.yaconfig.server.message.YAServerMessage;
 
 import io.netty.channel.ChannelId;
 
@@ -15,7 +15,7 @@ public class YAConfig{
 	
 	private EndPointSet eps;
 	
-	private Watchers ws;
+	private ServerWatchers ws;
 	
 	public Executor exec;
 	
@@ -53,7 +53,7 @@ public class YAConfig{
 		
 		exec = new Executor(this);
 		
-		ws = new Watchers();
+		ws = new ServerWatchers();
 		
 		VID = new AtomicLong(0);
 		promisedNum = new AtomicLong(-1);
@@ -70,7 +70,7 @@ public class YAConfig{
 		eps.add(new EndPoint("4249","127.0.0.1:4249"));
 		//eps.add(new EndPoint("4244","127.0.0.1:4244"));
 		
-		Watcher epWatcher = new Watcher(YAConfig.SYSTEM_PERFIX + ".node..*");
+		ServerWatcher epWatcher = new ServerWatcher(YAConfig.SYSTEM_PERFIX + ".node..*");
 		epWatcher.setChangeListener(new IChangeListener(){
 
 			@Override
@@ -89,7 +89,7 @@ public class YAConfig{
 		});
 		ws.addWatcher(epWatcher);
 		
-		Watcher masterWatcher = new Watcher(YAConfig.SYSTEM_PERFIX + ".master");
+		ServerWatcher masterWatcher = new ServerWatcher(YAConfig.SYSTEM_PERFIX + ".master");
 		masterWatcher.setChangeListener(new IChangeListener(){
 
 			@Override
@@ -148,7 +148,7 @@ public class YAConfig{
         getEps().run();
         
         
-        Watcher test = new Watcher("com.test.test");
+        ServerWatcher test = new ServerWatcher("com.test.test");
 		test.setChangeListener(new IChangeListener(){
 
 			@Override
@@ -161,7 +161,7 @@ public class YAConfig{
         
 	}
 
-	public Watchers getWatcherSet() {
+	public ServerWatchers getWatcherSet() {
 		return ws;
 	}
 	

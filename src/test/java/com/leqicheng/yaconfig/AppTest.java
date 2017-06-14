@@ -2,37 +2,14 @@ package com.leqicheng.yaconfig;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.yaconfig.message.YAMessage;
-import com.yaconfig.message.YAMessageDecoder;
-import com.yaconfig.message.YAMessageEncoder;
-import com.yaconfig.message.YAServerMessage;
-import com.yaconfig.message.YAServerMessageDecoder;
-import com.yaconfig.message.YAServerMessageEncoder;
-import com.yaconfig.message.YAServerMessageHeader;
-import com.yaconfig.server.EndPoint;
-import com.yaconfig.server.PeerDeadHandler;
-import com.yaconfig.server.YAConfig;
-import com.yaconfig.server.YAConfigMessageHandler;
-import com.yaconfig.server.YAConfigAcceptor.ConnectionListener;
+import com.yaconfig.client.Watcher;
+import com.yaconfig.client.YAConfigClient;
+import com.yaconfig.client.WatcherListener;
+import com.yaconfig.client.message.YAMessage;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.handler.codec.serialization.ClassResolvers;
-import io.netty.handler.codec.serialization.ObjectDecoder;
-import io.netty.handler.codec.serialization.ObjectEncoder;
-import io.netty.handler.timeout.IdleStateHandler;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -56,13 +33,13 @@ public class AppTest
 	
 	public int index = 0;
 	
-	public int threadNum = 1;
+	public int threadNum = 10;
 	
-	public static final int count = 1;
+	public static final int count = 10;
 	
 	public ChannelFuture[] cfs = new ChannelFuture[threadNum];
 	
-	public ChannelFuture watcherCF;
+	public YAConfigClient yaclient;
 	
     /**
      * Create the test case
@@ -80,7 +57,7 @@ public class AppTest
     	    	for(int i=0;i<AppTest.count;i++){
     	    		
     	    		YAMessage yamsg = new YAMessage(YAMessage.Type.PUT_NOPROMISE,
-    	    				"com.test.test","qqqq".getBytes());
+    	    				"com.test." + (int)(Math.random()*10),"qqqq".getBytes());
     	    		try {
     	    			System.out.println(sendCount.incrementAndGet());
     					cfs[index].channel().writeAndFlush(yamsg).sync();
@@ -111,21 +88,35 @@ public class AppTest
     	
     	//service.execute(everyConnectTask);
     	
-    	watcherCF = connect();
+    	yaclient = new YAConfigClient("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890");
     	
-    	if(watcherCF.isSuccess()){
-    		YAMessage msg = new YAMessage(YAMessage.Type.WATCH,"system.*","".getBytes());
-    		watcherCF.channel().writeAndFlush(msg);
+    	yaclient.watch("com.test.*", new WatcherListener(){
+
+			@Override
+			public void onDelete(Watcher w,String key) {
+				System.out.println(key + ": deleted!");
+			}
+
+			@Override
+			public void onAdd(Watcher w,String key) {
+				System.out.println(key + ": added!");
+			}
+
+			@Override
+			public void onUpdate(Watcher w,String key) {
+				System.out.println(key + ": updated!");
+			}
     		
-    		Thread.sleep(2000);
-    		
-        	for(int i=0;i<threadNum;i++){
-        		cfs[i] = connect();
-        		index = i;
-        		if(cfs[i].isSuccess()){
-        			service.execute(allinoneTask);
-        		}
-        	}
+    	});
+    	
+    	Thread.sleep(3000);
+    	
+    	for(int i=0;i<threadNum;i++){
+    		cfs[i] = yaclient.connect0("127.0.0.1",8888).awaitUninterruptibly();
+    		index = i;
+    		if(cfs[i].isSuccess()){
+    			service.execute(allinoneTask);
+    		}
     	}
     	
 		long begin = System.currentTimeMillis() / 1000;
@@ -142,28 +133,6 @@ public class AppTest
 		//long end = System.currentTimeMillis() / 1000;
 		
 		//System.out.println(sendCount.get() / (end - begin) + " QPS");
-    }
-    
-    public ChannelFuture connect(){
-    	final AppTest myself = this;
-		Bootstrap boot = new Bootstrap();
-		boot.group(new NioEventLoopGroup())
-		.channel(NioSocketChannel.class)
-		.handler(new ChannelInitializer<SocketChannel>() {
-			@Override
-			public void initChannel(SocketChannel ch) throws Exception {
-				ChannelPipeline p = ch.pipeline();
-				p.addLast(
-							 new LengthFieldBasedFrameDecoder(65535,0,2,0,2),
-							 new YAMessageDecoder(),
-							 new YAConfigTestClientHandler(myself),
-							 new LengthFieldPrepender(2),
-							 new YAMessageEncoder()
-						 );
-		 	}
-		}).option(ChannelOption.SO_KEEPALIVE,true)
-		  .option(ChannelOption.TCP_NODELAY,true);
-		return boot.connect("127.0.0.1",8888).awaitUninterruptibly();	
     }
 
 }

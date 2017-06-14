@@ -3,40 +3,43 @@ package com.yaconfig.server;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.yaconfig.server.message.YAServerMessage;
+import com.yaconfig.server.message.YAServerMessage.Type;
+
 public class UnPromisedMessages{
 	
 	ConcurrentHashMap<Long,ArrayList<String>> promise;
-	ConcurrentHashMap<Long,YAMessage> msgs; 
-	YAConfigServer server;
+	ConcurrentHashMap<Long,YAServerMessage> msgs; 
+	YAConfigProposer server;
 	
-	public UnPromisedMessages(YAConfigServer server){
+	public UnPromisedMessages(YAConfigProposer server){
 		promise = new ConcurrentHashMap<Long,ArrayList<String>>();
-		msgs = new ConcurrentHashMap<Long,YAMessage>();
+		msgs = new ConcurrentHashMap<Long,YAServerMessage>();
 		this.server = server;
 	}
 	
-	public void countPromise(YAMessage msg){
-		Long sequenceNum = msg.sequenceNum;
+	public void countPromise(YAServerMessage msg){
+		Long sequenceNum = msg.getSequenceNum();
 		ArrayList<String> promisedServerIDs;
 
 		synchronized(this){
 			if(null != promise.get(sequenceNum)){
 				promisedServerIDs = promise.get(sequenceNum);
 				//TCP may re-send messages when timeout
-				if(!alreadyPromised(promisedServerIDs,msg.serverID)){		
-					promisedServerIDs.add(msg.serverID);
+				if(!alreadyPromised(promisedServerIDs,msg.getFromServerID())){		
+					promisedServerIDs.add(msg.getFromServerID());
 				}
 			}else{
 				promisedServerIDs = new ArrayList<String>();
-				promisedServerIDs.add(msg.serverID);
+				promisedServerIDs.add(msg.getFromServerID());
 				promise.putIfAbsent(sequenceNum, promisedServerIDs);
 			}
 			
 			//collect enough promise
 			if(promisedServerIDs.size() == YAConfig.quorums){
-				YAMessage yamsg = msgs.get(sequenceNum);
-				yamsg.type = YAMessage.Type.COMMIT;
-				this.server.broadcastToQuorums(yamsg);
+				YAServerMessage sendMsg = new YAServerMessage(msg.getKey(),msg.getValue(),
+						YAServerMessage.Type.COMMIT,msg.getSequenceNum());
+				this.server.broadcastToQuorums(sendMsg);
 				//should setVID when committed
 				//this.server.setVID(yamsg.serverID,sequenceNum);
 				promise.remove(sequenceNum);
@@ -54,8 +57,8 @@ public class UnPromisedMessages{
 		return false;
 	}
 
-	public void push(YAMessage yamsg){
-		msgs.putIfAbsent(yamsg.sequenceNum, yamsg);
+	public void push(YAServerMessage yamsg){
+		msgs.putIfAbsent(yamsg.getSequenceNum(), yamsg);
 	}
 	
 }
