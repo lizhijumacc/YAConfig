@@ -7,13 +7,13 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelId;
 
 public abstract class MessageProcessor extends ChannelContainer implements MessageProducer,MessageConsumer{
-	ExecutorService processService;
+	protected ExecutorService processService;
 	
-	YAMessageQueue rcvQueue;
+	protected YAMessageQueue rcvQueue;
 	
-	YAMessageQueue sendQueue;
+	protected YAMessageQueue sendQueue;
 	
-	YAMessageQueue boardcastQueue;
+	protected YAMessageQueue boardcastQueue;
 	
 	public MessageProcessor(){
 		processService = Executors.newCachedThreadPool();
@@ -65,8 +65,6 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 						Channel channel = channels.get(id);
 						if(channel != null && channel.isWritable() && channel.isActive()){
 							channel.writeAndFlush(sendMsg);
-						}else{
-							sendQueue.push(sendMsg);
 						}
 					} catch (InterruptedException e) {
 						e.printStackTrace();
@@ -94,8 +92,6 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 						for(Channel channel : channels.values()){
 							if(channel.isWritable() && channel.isActive()){
 								channel.writeAndFlush(yamsg);
-							}else{
-								boardcastQueue.push(yamsg);
 							}
 						}
 					} catch (InterruptedException e) {

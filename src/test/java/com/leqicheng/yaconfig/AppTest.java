@@ -33,9 +33,9 @@ public class AppTest
 	
 	public int index = 0;
 	
-	public int threadNum = 10;
+	public int threadNum = 2;
 	
-	public static final int count = 10;
+	public static final int count = 100;
 	
 	public ChannelFuture[] cfs = new ChannelFuture[threadNum];
 	
@@ -55,6 +55,13 @@ public class AppTest
         	public void run(){
         		
     	    	for(int i=0;i<AppTest.count;i++){
+    	    		
+    	    		try {
+						Thread.sleep(3000);
+					} catch (InterruptedException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
     	    		
     	    		YAMessage yamsg = new YAMessage(YAMessage.Type.PUT_NOPROMISE,
     	    				"com.test." + (int)(Math.random()*10),"qqqq".getBytes());
@@ -90,34 +97,44 @@ public class AppTest
     	
     	yaclient = new YAConfigClient("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890");
     	
-    	yaclient.watch("com.test.*", new WatcherListener(){
+    	try {
+			yaclient.watch("com.test.*", new WatcherListener(){
 
-			@Override
-			public void onDelete(Watcher w,String key) {
-				System.out.println(key + ": deleted!");
-			}
+				@Override
+				public void onDelete(Watcher w,String key) {
+					System.out.println(key + ": deleted!");
+				}
 
-			@Override
-			public void onAdd(Watcher w,String key) {
-				System.out.println(key + ": added!");
-			}
+				@Override
+				public void onAdd(Watcher w,String key) {
+					System.out.println(key + ": added!");
+				}
 
-			@Override
-			public void onUpdate(Watcher w,String key) {
-				System.out.println(key + ": updated!");
-			}
-    		
-    	});
+				@Override
+				public void onUpdate(Watcher w,String key) {
+					System.out.println(key + ": updated!");
+				}
+				
+			});
+		} catch (Exception e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
     	
-    	Thread.sleep(3000);
     	
-    	for(int i=0;i<threadNum;i++){
+    	for(int i=0;i<100;i++){
+    		Thread.sleep(3000);
+    		yaclient.put("com.test." + (int)(Math.random()*10), "uuuu".getBytes(), YAMessage.Type.PUT_NOPROMISE);
+    		System.out.println("write to!!!!");
+    	}
+    	
+    	/*for(int i=0;i<threadNum;i++){
     		cfs[i] = yaclient.connect0("127.0.0.1",8888).awaitUninterruptibly();
     		index = i;
     		if(cfs[i].isSuccess()){
     			service.execute(allinoneTask);
     		}
-    	}
+    	}*/
     	
 		long begin = System.currentTimeMillis() / 1000;
 

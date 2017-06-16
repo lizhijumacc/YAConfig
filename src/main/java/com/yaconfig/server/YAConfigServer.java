@@ -132,6 +132,7 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 				}
 				
 			});
+			
 			yaconfig.getWatcherSet().addWatcher(watcher);
 		}else if(yamsg.getType() == YAMessage.Type.UNWATCH){
 			yaconfig.getWatcherSet().removeWatcher(yamsg.key,ctx.channel().id());
