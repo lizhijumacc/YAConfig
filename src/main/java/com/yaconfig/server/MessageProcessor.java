@@ -4,6 +4,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelId;
 
 public abstract class MessageProcessor extends ChannelContainer implements MessageProducer,MessageConsumer{
@@ -11,14 +12,11 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 	
 	protected YAMessageQueue rcvQueue;
 	
-	protected YAMessageQueue sendQueue;
-	
 	protected YAMessageQueue boardcastQueue;
 	
 	public MessageProcessor(){
 		processService = Executors.newCachedThreadPool();
 		rcvQueue = new YAMessageQueue();
-		sendQueue = new YAMessageQueue();
 		boardcastQueue = new YAMessageQueue();
 	}
 	
@@ -48,36 +46,16 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 	}
 	
 	public void produce(Object msg,final ChannelId id){
-		
 		if(id == null || msg == null){
 			return;
 		}
 		
-		try {
-			sendQueue.push(msg);
-			processService.execute(new Runnable(){
-
-				@Override
-				public void run() {
-					try {
-						Object sendMsg = sendQueue.take();
-						
-						Channel channel = channels.get(id);
-						if(channel != null && channel.isWritable() && channel.isActive()){
-							channel.writeAndFlush(sendMsg);
-						}
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-				
-			});
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+		Channel channel = channels.get(id);
+		if(channel != null && channel.isWritable() && channel.isActive()){
+			channel.writeAndFlush(msg);
 		}
 	}
 
-	
 	public void boardcast(Object msg){
 		try {
 			boardcastQueue.push(msg);

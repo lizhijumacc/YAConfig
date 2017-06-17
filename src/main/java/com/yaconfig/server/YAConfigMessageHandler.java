@@ -11,7 +11,6 @@ public class YAConfigMessageHandler extends ChannelInboundHandlerAdapter {
 		this.processor = processor;
 	}
 	
-	
 	@Override
 	public void channelActive(ChannelHandlerContext ctx){
 		processor.channelActive(ctx.channel());
@@ -36,4 +35,5 @@ public class YAConfigMessageHandler extends ChannelInboundHandlerAdapter {
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		processor.channelInactive(ctx.channel());
 	}
+	
 }

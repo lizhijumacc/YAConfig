@@ -1,11 +1,15 @@
 package com.leqicheng.yaconfig;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.yaconfig.client.AbstractFuture;
+import com.yaconfig.client.IFutureListener;
 import com.yaconfig.client.Watcher;
 import com.yaconfig.client.YAConfigClient;
+import com.yaconfig.client.YAFuture;
 import com.yaconfig.client.WatcherListener;
 import com.yaconfig.client.message.YAMessage;
 
@@ -64,7 +68,7 @@ public class AppTest
 					}
     	    		
     	    		YAMessage yamsg = new YAMessage(YAMessage.Type.PUT_NOPROMISE,
-    	    				"com.test." + (int)(Math.random()*10),"qqqq".getBytes());
+    	    				"com.test." + (int)(Math.random()*10),String.valueOf((int)Math.random()*100).getBytes());
     	    		try {
     	    			System.out.println(sendCount.incrementAndGet());
     					cfs[index].channel().writeAndFlush(yamsg).sync();
@@ -112,7 +116,23 @@ public class AppTest
 
 				@Override
 				public void onUpdate(Watcher w,String key) {
+					final String k = key;
 					System.out.println(key + ": updated!");
+					yaclient.get(key, YAMessage.Type.GET_LOCAL)
+						.addListener(new IFutureListener<byte[]>(){
+
+							@Override
+							public void operationCompleted(AbstractFuture<byte[]> future) {
+								if(future.isSuccess()){
+									try {
+										System.out.println("GET KEY:" + k + " VALUE:" + future.get());
+									} catch (InterruptedException | ExecutionException e) {
+										e.printStackTrace();
+									}
+								}
+							}
+						
+					});
 				}
 				
 			});
@@ -122,10 +142,26 @@ public class AppTest
 		}
     	
     	
-    	for(int i=0;i<100;i++){
+    	for(int i=0;i<10;i++){
     		Thread.sleep(3000);
-    		yaclient.put("com.test." + (int)(Math.random()*10), "uuuu".getBytes(), YAMessage.Type.PUT_NOPROMISE);
-    		System.out.println("write to!!!!");
+    		YAFuture<?> f = yaclient.put("com.test." + (int)(Math.random()*10), 
+    				String.valueOf((int)Math.random()*100).getBytes(), YAMessage.Type.PUT_NOPROMISE);
+    		
+    		f.addListener(new IFutureListener(){
+
+				@Override
+				public void operationCompleted(AbstractFuture f) {
+					if(f.isSuccess()){
+						System.out.println("PUT success:");
+					}
+				}
+    			
+    		});
+    		
+    		if(i == 5){
+    			yaclient.unwatch("com.test.*");
+    			System.out.println("unwatch");
+    		}
     	}
     	
     	/*for(int i=0;i<threadNum;i++){

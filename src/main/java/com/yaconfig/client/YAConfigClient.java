@@ -4,6 +4,8 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +27,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.FutureListener;
 
 public class YAConfigClient extends MessageProcessor{
 	
@@ -40,6 +44,8 @@ public class YAConfigClient extends MessageProcessor{
 	
 	private ScheduledExecutorService keepaliveTask;
 	
+	private ConcurrentHashMap<Long,YAFuture<byte[]>> futures;
+	
 	private Object isWritable = new Object();
 	
 	public YAConfigClient(String connStr){
@@ -47,6 +53,7 @@ public class YAConfigClient extends MessageProcessor{
 		this.watchers = new HashMap<String,Watcher>();
 		this.myself = this;
 		this.connnectStr = connStr;
+		futures = new ConcurrentHashMap<Long,YAFuture<byte[]>>();
 		
 		String[] split = connStr.split(",");
 		for(String s : split){
@@ -63,7 +70,7 @@ public class YAConfigClient extends MessageProcessor{
 				}
 			}
 			
-		},0, 3, TimeUnit.SECONDS);
+		},0, 10, TimeUnit.SECONDS);
 	}
 	
 	private ChannelFuture connect0(String host,int port){
@@ -84,7 +91,8 @@ public class YAConfigClient extends MessageProcessor{
 		 	}
 		}).option(ChannelOption.SO_KEEPALIVE,true)
 		  .option(ChannelOption.TCP_NODELAY,true)
-		  .option(ChannelOption.SO_REUSEADDR, true);
+		  .option(ChannelOption.SO_REUSEADDR, true)
+		  .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000);
 		return boot.connect(host,port);	
 	}
 
@@ -97,66 +105,41 @@ public class YAConfigClient extends MessageProcessor{
 			notifyWatchers(yamsg.getKey(),YAMessage.Type.DELETE);
 		}else if(yamsg.getType() == YAMessage.Type.UPDATE){
 			notifyWatchers(yamsg.getKey(),YAMessage.Type.UPDATE);
-		}
-	}
-	
-	public void put(String key,byte[] value,int type){
-		
-		if(checkChannel()){
-			produce(new YAMessage(type,key,value),channel.id());
-		}else{
-			try {
-				synchronized(isWritable){
-					isWritable.wait();
-				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+		}else if(yamsg.getType() == YAMessage.Type.ACK){
+			YAFuture<byte[]> f = futures.get(yamsg.getId());
+			if(f != null){
+				f.setSuccess(yamsg.getValue());
 			}
-			produce(new YAMessage(type,key,value),channel.id());
 		}
 	}
 	
-	public void get(String key,int type){
-		
-		if(checkChannel()){
-			produce(new YAMessage(type,key,"".getBytes()),channel.id());
-		}else{
-			try {
-				synchronized(isWritable){
-					isWritable.wait();
-				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			
-			produce(new YAMessage(type,key,"".getBytes()),channel.id());
-		}
+	public YAFuture<byte[]> put(String key,byte[] value,int type){
+		return writeCommand(key,value,type);
 	}
 	
-	public void watch(String key,WatcherListener... listeners){
-		
-		if(checkChannel()){
-			watch0(key,channel,listeners);
-		}else{
-			try {
-				synchronized(isWritable){
-					isWritable.wait();
-				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			
-			watch0(key,channel,listeners);
-		}
+	public YAFuture<byte[]> get(String key,int type){
+		return writeCommand(key,"".getBytes(),type);
+	}
+
+	public YAFuture<byte[]> watch(String key,WatcherListener... listeners){
+		watchLocal(key,listeners);
+		return writeCommand(key,"".getBytes(),YAMessage.Type.WATCH);
 	}
 	
-	public void unwatch(String key){
-		
-		synchronized(this.watchers){
+	public YAFuture<byte[]> unwatch(final String key){
+		synchronized(myself.watchers){
 			watchers.remove(key);
 		}
+		return writeCommand(key,"".getBytes(),YAMessage.Type.UNWATCH);
+	}
+	
+	private YAFuture<byte[]> writeCommand(String key, byte[] bytes, int type) {
+		YAMessage yamsg = new YAMessage(type,key,bytes);
+		YAFuture<byte[]> f = new YAFuture<byte[]>();
+		futures.putIfAbsent(yamsg.getId(), f);
+		
 		if(checkChannel()){
-			produce(new YAMessage(YAMessage.Type.UNWATCH,key,"".getBytes()),channel.id());
+			produce(yamsg,channel.id());
 		}else{
 			try {
 				synchronized(isWritable){
@@ -166,13 +149,10 @@ public class YAConfigClient extends MessageProcessor{
 				e.printStackTrace();
 			}
 			
-			produce(new YAMessage(YAMessage.Type.UNWATCH,key,"".getBytes()),channel.id());
+			produce(yamsg,channel.id());
 		}
-	}
-	
-	private void watch0(String key,Channel channel,WatcherListener... listeners){
-		produce(new YAMessage(YAMessage.Type.WATCH,key,"".getBytes()),channel.id());
-		watchLocal(key,listeners);
+		
+		return f;
 	}
 	
 	private void watchLocal(String key,WatcherListener... listeners){
@@ -220,9 +200,8 @@ public class YAConfigClient extends MessageProcessor{
 			synchronized(this){
 				if(channel == null){
 					for(Node n : nodes){
-						ChannelFuture cf = connect0(n.getIp(),n.getPort());
-						boolean isDone = cf.awaitUninterruptibly(2, TimeUnit.SECONDS);
-						if(isDone && cf.isSuccess()){
+						ChannelFuture cf = connect0(n.getIp(),n.getPort()).awaitUninterruptibly();
+						if(cf.isSuccess()){
 							break;
 						}else{
 							cf.channel().close();

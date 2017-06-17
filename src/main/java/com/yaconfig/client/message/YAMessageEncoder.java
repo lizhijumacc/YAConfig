@@ -11,6 +11,7 @@ public class YAMessageEncoder extends MessageToByteEncoder<YAMessage>{
 		out.writeInt(msg.length());
 		out.writeInt(msg.header.type);
 		out.writeInt(msg.header.version);
+		out.writeLong(msg.header.id);
 		out.writeInt(msg.getKey().getBytes().length);
 		out.writeBytes(msg.getKey().getBytes());
 		out.writeInt(msg.getValue().length);

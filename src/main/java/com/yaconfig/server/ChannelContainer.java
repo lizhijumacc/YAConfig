@@ -3,6 +3,7 @@ package com.yaconfig.server;
 import java.util.concurrent.ConcurrentHashMap;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelId;
 
 public abstract class ChannelContainer {
@@ -43,4 +44,5 @@ public abstract class ChannelContainer {
 	public void exceptionCaught(Channel channel, Throwable cause) throws Exception {
 		removeChannel(channel);
 	}
+	
 }

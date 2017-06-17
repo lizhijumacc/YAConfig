@@ -13,6 +13,7 @@ public class YAMessageDecoder extends ByteToMessageDecoder{
 		int length = in.readInt();
 		int type = in.readInt();
 		int version = in.readInt();
+		long id = in.readLong();
 		int keyLength = in.readInt();
 		byte[] keyBytes = new byte[keyLength];
 		in.readBytes(keyBytes);
@@ -23,6 +24,7 @@ public class YAMessageDecoder extends ByteToMessageDecoder{
 		
 		YAMessage msg = new YAMessage(type,new String(keyBytes),valueBytes);
 		msg.header.version = version;
+		msg.header.id = id;
 		
 		YAMessageWrapper msgw = new YAMessageWrapper();
 		msgw.ctx = ctx;

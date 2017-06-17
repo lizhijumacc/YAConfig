@@ -5,6 +5,7 @@ import com.yaconfig.client.message.YAMessageDecoder;
 import com.yaconfig.client.message.YAMessageEncoder;
 import com.yaconfig.client.message.YAMessageWrapper;
 import com.yaconfig.server.commands.PutCommand;
+import com.yaconfig.server.storage.YAHashMap;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -68,6 +69,7 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 			 })
 			 .option(ChannelOption.SO_BACKLOG, 128)
 			 .option(ChannelOption.SO_REUSEADDR, true)
+			 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
 			 .childOption(ChannelOption.TCP_NODELAY, true)
 			 .childOption(ChannelOption.SO_KEEPALIVE, true)
 			 .childOption(ChannelOption.SO_REUSEADDR, true)
@@ -106,14 +108,17 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 			PutCommand put = new PutCommand("put");
 			put.setExecutor(yaconfig.exec);
 			put.execute(yamsg.getKey(), yamsg.getValue(), false);
+			ack(yamsgw,"".getBytes());
 		}else if(yamsg.getType() == YAMessage.Type.PUT_NOPROMISE){
 			PutCommand put = new PutCommand("put");
 			put.setExecutor(yaconfig.exec);
 			put.execute(yamsg.getKey(), yamsg.getValue(), true);
+			ack(yamsgw,"".getBytes());
 		}else if(yamsg.getType() == YAMessage.Type.GET){
-			
+			//TODO : should GET from current master
+			ack(yamsgw,YAHashMap.getInstance().get(yamsg.key));
 		}else if(yamsg.getType() == YAMessage.Type.GET_LOCAL){
-			
+			ack(yamsgw,YAHashMap.getInstance().get(yamsg.key));
 		}else if(yamsg.getType() == YAMessage.Type.WATCH){
 			final ServerWatcher watcher = new ServerWatcher(yamsg.key);
 			watcher.setChannelId(ctx.channel().id());
@@ -134,11 +139,19 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 			});
 			
 			yaconfig.getWatcherSet().addWatcher(watcher);
+			ack(yamsgw,"".getBytes());
 		}else if(yamsg.getType() == YAMessage.Type.UNWATCH){
 			yaconfig.getWatcherSet().removeWatcher(yamsg.key,ctx.channel().id());
+			ack(yamsgw,"".getBytes());
 		}
 	}
 	
+	private void ack(YAMessageWrapper yamsgw, byte[] bytes) {
+		YAMessage sendMsg = new YAMessage(YAMessage.Type.ACK,yamsgw.msg.getKey(),bytes);
+		sendMsg.setId(yamsgw.msg.getId());
+		produce(sendMsg,yamsgw.ctx.channel().id());
+	}
+
 	@Override
 	public void channelInactive(Channel channel){
 		yaconfig.getWatcherSet().removeWatcher(channel.id());

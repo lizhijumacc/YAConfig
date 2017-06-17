@@ -83,6 +83,7 @@ public class YAConfigProposer extends MessageProcessor implements Runnable{
 			 })
 			 .option(ChannelOption.SO_BACKLOG, 128)
 			 .option(ChannelOption.SO_REUSEADDR, true)
+			 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
 			 .childOption(ChannelOption.SO_KEEPALIVE, true)
 			 .childOption(ChannelOption.TCP_NODELAY, true)
 			 .childOption(ChannelOption.SO_REUSEADDR, true)

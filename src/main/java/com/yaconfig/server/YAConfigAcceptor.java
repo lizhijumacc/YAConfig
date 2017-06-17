@@ -20,6 +20,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -61,6 +62,7 @@ public class YAConfigAcceptor extends MessageProcessor implements Runnable{
 			}).option(ChannelOption.SO_KEEPALIVE,true)
 			  .option(ChannelOption.TCP_NODELAY,true)
 			  .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
+
 		bootstrap.connect(ip,port).addListener(new ConnectionListener(this,ip,port));		
 	}
 
