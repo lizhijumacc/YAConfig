@@ -9,6 +9,7 @@ import com.yaconfig.client.AbstractFuture;
 import com.yaconfig.client.IFutureListener;
 import com.yaconfig.client.Watcher;
 import com.yaconfig.client.YAConfigClient;
+import com.yaconfig.client.YAEntry;
 import com.yaconfig.client.YAFuture;
 import com.yaconfig.client.WatcherListener;
 import com.yaconfig.client.message.YAMessage;
@@ -101,58 +102,58 @@ public class AppTest
     	
     	yaclient = new YAConfigClient("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890");
     	
-    	try {
-			yaclient.watch("com.test.*", new WatcherListener(){
+		yaclient.watch("com.test.*", new WatcherListener(){
 
-				@Override
-				public void onDelete(Watcher w,String key) {
-					System.out.println(key + ": deleted!");
-				}
+			@Override
+			public void onDelete(Watcher w,String key) {
+				System.out.println(key + ": deleted!");
+			}
 
-				@Override
-				public void onAdd(Watcher w,String key) {
-					System.out.println(key + ": added!");
-				}
+			@Override
+			public void onAdd(Watcher w,String key) {
+				System.out.println(key + ": added!");
+			}
 
-				@Override
-				public void onUpdate(Watcher w,String key) {
-					final String k = key;
-					System.out.println(key + ": updated!");
-					yaclient.get(key, YAMessage.Type.GET_LOCAL)
-						.addListener(new IFutureListener<byte[]>(){
+			@Override
+			public void onUpdate(Watcher w,String key) {
+				System.out.println(key + ": updated!");
+				yaclient.get(key, YAMessage.Type.GET_LOCAL)
+					.addListener(new IFutureListener<YAEntry>(){
 
-							@Override
-							public void operationCompleted(AbstractFuture<byte[]> future) {
-								if(future.isSuccess()){
-									try {
-										System.out.println("GET KEY:" + k + " VALUE:" + future.get());
-									} catch (InterruptedException | ExecutionException e) {
-										e.printStackTrace();
-									}
+						@Override
+						public void operationCompleted(AbstractFuture<YAEntry> future) {
+							if(future.isSuccess()){
+								try {
+									System.out.println("GET KEY:" + future.get().getKey() 
+											+ " VALUE:" + new String(future.get().getValue()));
+								} catch (InterruptedException | ExecutionException e) {
+									e.printStackTrace();
 								}
 							}
-						
-					});
-				}
-				
-			});
-		} catch (Exception e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-    	
+						}
+					
+				});
+			}
+			
+		});    
     	
     	for(int i=0;i<10;i++){
-    		Thread.sleep(3000);
-    		YAFuture<?> f = yaclient.put("com.test." + (int)(Math.random()*10), 
-    				String.valueOf((int)Math.random()*100).getBytes(), YAMessage.Type.PUT_NOPROMISE);
+    		Thread.sleep(2000);
+    		YAFuture<YAEntry> f = yaclient.put("com.test." + (int)(Math.random()*5), 
+    				"ddddddd".getBytes(), YAMessage.Type.PUT_NOPROMISE);
     		
-    		f.addListener(new IFutureListener(){
+    		f.addListener(new IFutureListener<YAEntry>(){
 
 				@Override
-				public void operationCompleted(AbstractFuture f) {
+				public void operationCompleted(AbstractFuture<YAEntry> f) {
 					if(f.isSuccess()){
-						System.out.println("PUT success:");
+						try {
+							System.out.println("PUT success: " + f.get().getKey());
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						} catch (ExecutionException e) {
+							e.printStackTrace();
+						}
 					}
 				}
     			

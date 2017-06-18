@@ -27,8 +27,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.FutureListener;
 
 public class YAConfigClient extends MessageProcessor{
 	
@@ -42,9 +40,13 @@ public class YAConfigClient extends MessageProcessor{
 	
 	private YAConfigClient myself;
 	
-	private ScheduledExecutorService keepaliveTask;
+	private ScheduledExecutorService scheduleTask;
 	
-	private ConcurrentHashMap<Long,YAFuture<byte[]>> futures;
+	private ConcurrentHashMap<Long,YAFuture<YAEntry>> futures;
+	
+	public static final int RECONNECT_WAIT = 5000;
+	
+	public static final int MAX_FUTURE_WAIT = 5000;
 	
 	private Object isWritable = new Object();
 	
@@ -53,26 +55,53 @@ public class YAConfigClient extends MessageProcessor{
 		this.watchers = new HashMap<String,Watcher>();
 		this.myself = this;
 		this.connnectStr = connStr;
-		futures = new ConcurrentHashMap<Long,YAFuture<byte[]>>();
+		futures = new ConcurrentHashMap<Long,YAFuture<YAEntry>>();
 		
 		String[] split = connStr.split(",");
 		for(String s : split){
 			nodes.add(new Node(s));
 		}
 		
-		keepaliveTask = Executors.newSingleThreadScheduledExecutor();
-		keepaliveTask.scheduleAtFixedRate(new Runnable(){
+		scheduleTask = Executors.newSingleThreadScheduledExecutor();
+		scheduleTask.scheduleAtFixedRate(new Runnable(){
 
 			@Override
 			public void run() {
 				if(channel == null){
+					failAllFuture();
 					connectServer();
 				}
 			}
 			
-		},0, 10, TimeUnit.SECONDS);
+		},0, RECONNECT_WAIT, TimeUnit.MILLISECONDS);
+		
+		scheduleTask.scheduleAtFixedRate(new Runnable(){
+
+			@Override
+			public void run() {
+				purgeFutures();
+			}
+			
+		},0, MAX_FUTURE_WAIT, TimeUnit.MILLISECONDS);
 	}
 	
+	protected void purgeFutures() {
+		for(Entry<Long,YAFuture<YAEntry>> e : futures.entrySet()){
+			YAFuture<YAEntry> f = e.getValue();
+			if(System.currentTimeMillis() - f.createTime > MAX_FUTURE_WAIT){
+				f.setFailure(new YAFutureTimeoutException("Future Timeout."));
+				futures.remove(e.getKey());
+			}
+		}
+	}
+
+	protected void failAllFuture() {
+		for(YAFuture<YAEntry> f : futures.values()){
+			f.setFailure(new YAServerDeadException("Server Closed. Reconnecting..."));
+		}
+		futures.clear();
+	}
+
 	private ChannelFuture connect0(String host,int port){
 		Bootstrap boot = new Bootstrap();
 		boot.group(new NioEventLoopGroup())
@@ -106,36 +135,43 @@ public class YAConfigClient extends MessageProcessor{
 		}else if(yamsg.getType() == YAMessage.Type.UPDATE){
 			notifyWatchers(yamsg.getKey(),YAMessage.Type.UPDATE);
 		}else if(yamsg.getType() == YAMessage.Type.ACK){
-			YAFuture<byte[]> f = futures.get(yamsg.getId());
+			YAFuture<YAEntry> f = futures.get(yamsg.getId());
 			if(f != null){
-				f.setSuccess(yamsg.getValue());
+				f.setSuccess(new YAEntry(yamsg.getKey(),yamsg.getValue()));
+				futures.remove(yamsg.getId());
+			}
+		}else if(yamsg.getType() == YAMessage.Type.NACK){
+			YAFuture<YAEntry> f = futures.get(yamsg.getId());
+			if(f != null){
+				f.setFailure(new YAOperationErrorException("YAConfig operation error."));
+				futures.remove(yamsg.getId());
 			}
 		}
 	}
 	
-	public YAFuture<byte[]> put(String key,byte[] value,int type){
+	public YAFuture<YAEntry> put(String key,byte[] value,int type){
 		return writeCommand(key,value,type);
 	}
 	
-	public YAFuture<byte[]> get(String key,int type){
+	public YAFuture<YAEntry> get(String key,int type){
 		return writeCommand(key,"".getBytes(),type);
 	}
 
-	public YAFuture<byte[]> watch(String key,WatcherListener... listeners){
+	public YAFuture<YAEntry> watch(String key,WatcherListener... listeners){
 		watchLocal(key,listeners);
 		return writeCommand(key,"".getBytes(),YAMessage.Type.WATCH);
 	}
 	
-	public YAFuture<byte[]> unwatch(final String key){
+	public YAFuture<YAEntry> unwatch(final String key){
 		synchronized(myself.watchers){
 			watchers.remove(key);
 		}
 		return writeCommand(key,"".getBytes(),YAMessage.Type.UNWATCH);
 	}
 	
-	private YAFuture<byte[]> writeCommand(String key, byte[] bytes, int type) {
+	private YAFuture<YAEntry> writeCommand(String key, byte[] bytes, int type) {
 		YAMessage yamsg = new YAMessage(type,key,bytes);
-		YAFuture<byte[]> f = new YAFuture<byte[]>();
+		YAFuture<YAEntry> f = new YAFuture<YAEntry>();
 		futures.putIfAbsent(yamsg.getId(), f);
 		
 		if(checkChannel()){
