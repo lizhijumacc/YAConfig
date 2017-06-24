@@ -46,9 +46,10 @@ public class ServerTest
 	public ChannelFuture[] cfs = new ChannelFuture[threadNum];
 	
 	public YAConfigClient yaclient;
+
+	public String remoteValue;
 	
-	@YAConfigValue(key = "com.test.0")
-	public static String remoteValue;
+	public ServerTest myself;
 	
     /**
      * Create the test case
@@ -58,6 +59,8 @@ public class ServerTest
     public ServerTest( String testName )
     {
         super( testName );
+        
+        myself = this;
         
         allinoneTask = new Runnable(){
         	@Override
@@ -73,7 +76,7 @@ public class ServerTest
 					}
     	    		
     	    		YAMessage yamsg = new YAMessage(YAMessage.Type.PUT_NOPROMISE,
-    	    				"com.test." + (int)(Math.random()*2),String.valueOf((int)Math.random()*100).getBytes());
+    	    				"com.test." + (int)(Math.random()*1),String.valueOf((int)Math.random()*100).getBytes());
     	    		try {
     	    			System.out.println(sendCount.incrementAndGet());
     					cfs[index].channel().writeAndFlush(yamsg).sync();
@@ -111,30 +114,24 @@ public class ServerTest
 
 			@Override
 			public void onDelete(Watcher w,String key) {
-				System.out.println(key + ": deleted!");
+				//System.out.println(key + ": deleted!");
 			}
 
 			@Override
 			public void onAdd(Watcher w,String key) {
-				System.out.println(key + ": added!");
+				//System.out.println(key + ": added!");
 			}
 
 			@Override
 			public void onUpdate(Watcher w,String key) {
-				System.out.println("9999999999999999999" + ServerTest.remoteValue);
-				System.out.println(key + ": updated!");
+				//System.out.println(key + ": updated!");
 				yaclient.get(key, YAMessage.Type.GET_LOCAL)
 					.addListener(new FutureListener<YAEntry>(){
 
 						@Override
 						public void operationCompleted(AbstractFuture<YAEntry> future) {
 							if(future.isSuccess()){
-								try {
-									System.out.println("GET KEY:" + future.get().getKey() 
-											+ " VALUE:" + new String(future.get().getValue()));
-								} catch (InterruptedException | ExecutionException e) {
-									e.printStackTrace();
-								}
+								
 							}
 						}
 					
@@ -143,32 +140,27 @@ public class ServerTest
 			
 		});    
     	
+		TestConfig conf = new TestConfig(yaclient);
     	for(int i=0;i<10;i++){
     		Thread.sleep(2000);
     		YAFuture<YAEntry> f = yaclient.put("com.test." + (int)(Math.random()*5), 
-    				"ddddddd".getBytes(), YAMessage.Type.PUT_NOPROMISE);
+    				"5656565".getBytes(), YAMessage.Type.PUT_NOPROMISE);
     		
     		f.addListener(new FutureListener<YAEntry>(){
 
 				@Override
 				public void operationCompleted(AbstractFuture<YAEntry> f) {
-					if(f.isSuccess()){
-						try {
-							System.out.println("PUT success: " + f.get().getKey());
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						} catch (ExecutionException e) {
-							e.printStackTrace();
-						}
-					}
+					System.out.println("put success!");
 				}
     			
     		});
     		
-    		if(i == 5){
+    		System.out.println("TESTCONFIG VALUE: " + conf.value);
+    		
+    		/*if(i == 5){
     			yaclient.unwatch("com.test.*");
     			System.out.println("unwatch");
-    		}
+    		}*/
     	}
     	
     	/*for(int i=0;i<threadNum;i++){

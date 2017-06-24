@@ -40,7 +40,6 @@ public class PackageScanner {
 
 				public void onDelete(Watcher w, String key) {
 					try {
-						System.out.println("scan delete.");
 						yaconfig.injectValue(new YAEntry(key,null),field);
 					} catch (IllegalArgumentException e) {
 						e.printStackTrace();
@@ -48,7 +47,6 @@ public class PackageScanner {
 				}
 
 				public void onAdd(Watcher w, String key) {
-					System.out.println("scan add.");
 					YAFuture<YAEntry> f = yaconfig.get(key, YAMessage.Type.GET_LOCAL);
 					if(f.isSuccess()){
 						try {
@@ -61,7 +59,7 @@ public class PackageScanner {
 				}
 
 				public void onUpdate(Watcher w, String key) {
-					System.out.println("scan update.");
+					System.out.println("update!!!");
 					YAFuture<YAEntry> f = (YAFuture<YAEntry>) yaconfig.get(key, YAMessage.Type.GET_LOCAL).awaitUninterruptibly();
 					if(f.isSuccess()){
 						try {

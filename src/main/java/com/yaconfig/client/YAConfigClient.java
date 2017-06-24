@@ -1,9 +1,12 @@
 package com.yaconfig.client;
 import java.io.IOException;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,7 +24,6 @@ import com.yaconfig.common.MessageProcessor;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
@@ -51,6 +53,8 @@ public class YAConfigClient extends MessageProcessor{
 	
 	public static final int MAX_FUTURE_WAIT = 10000;
 	
+	public static final int SOFT_GC_INTERVAL = 1000;
+	
 	private static String SEPERATOR_TOKEN = ",";
 	
 	public Object notifyConnected = new Object();
@@ -59,6 +63,10 @@ public class YAConfigClient extends MessageProcessor{
 	
 	private String scanPackage;
 	
+	private List<SoftReference<AbstractConfig>> registry;
+	
+	public ReferenceQueue<? super AbstractConfig> queue;
+	
 	public YAConfigClient(String connStr,String scanPackage){
 		this.nodes = new ArrayList<Node>();
 		this.watchers = new HashMap<String,Watcher>();
@@ -66,6 +74,8 @@ public class YAConfigClient extends MessageProcessor{
 		this.connnectStr = connStr;
 		this.scanPackage = scanPackage;
 		this.scanner = new PackageScanner(this);
+		this.registry = new LinkedList<SoftReference<AbstractConfig>>();
+		this.queue = new ReferenceQueue();
 		futures = new ConcurrentHashMap<Long,YAFuture<YAEntry>>();
 		
 		String[] split = connStr.split(",");
@@ -93,11 +103,30 @@ public class YAConfigClient extends MessageProcessor{
 				purgeFutures();
 			}
 			
-		},0, MAX_FUTURE_WAIT, TimeUnit.MILLISECONDS);
+		},100, MAX_FUTURE_WAIT, TimeUnit.MILLISECONDS);
+		
+		scheduleTask.scheduleAtFixedRate(new Runnable(){
+
+			@Override
+			public void run() {
+				purgeSoftQueue();
+			}
+			
+		},200, SOFT_GC_INTERVAL, TimeUnit.MILLISECONDS);
 		
 		scan();
 	}
 	
+	protected void purgeSoftQueue() {
+		while(true){  
+	        Object softRef = queue.poll();  
+	        if(softRef == null){  
+	                break;  
+	        }  
+	        registry.remove(softRef);  
+		}  
+	}
+
 	private void scan() {
 		String[] packageList = this.scanPackage.split(YAConfigClient.SEPERATOR_TOKEN);
 		this.scanner.scan(packageList);
@@ -317,15 +346,34 @@ public class YAConfigClient extends MessageProcessor{
 	}
 
 	public void injectValue(YAEntry yaEntry,Field feild) {
+		feild.setAccessible(true);
 		if(Modifier.isStatic(feild.getModifiers())){
-			feild.setAccessible(true);
 			try {
 				feild.set(feild.getClass(), new String(yaEntry.getValue()));
 			} catch (IllegalArgumentException | IllegalAccessException e) {
 				e.printStackTrace();
 			}
-		}else{
-			System.out.println("Config Field should be Static.");
+		} else {
+			final Class<?> clazz = feild.getDeclaringClass();
+			
+			synchronized(registry){
+				for(SoftReference<AbstractConfig> config : registry){
+					
+					if(clazz.equals(config.get().getClass())){
+						try {
+							feild.set(config.get(), new String(yaEntry.getValue()));
+						} catch (IllegalArgumentException | IllegalAccessException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	public void registerConfig(SoftReference<AbstractConfig> config){
+		synchronized(registry){
+			registry.add(config);
 		}
 	}
 
