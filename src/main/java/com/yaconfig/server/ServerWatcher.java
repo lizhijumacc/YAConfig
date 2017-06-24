@@ -5,7 +5,7 @@ import io.netty.channel.ChannelId;
 public class ServerWatcher {
 	private String rexStr;
 	
-	private IChangeListener changeListener;
+	private ChangeListener changeListener;
 	
 	public ChannelId channelId;
 
@@ -26,11 +26,11 @@ public class ServerWatcher {
 		this.rexStr = rexStr;
 	}
 
-	public void setChangeListener(IChangeListener changeListener) {
+	public void setChangeListener(ChangeListener changeListener) {
 		this.changeListener = changeListener;
 	}
 	
-	public IChangeListener getChangeListener(){
+	public ChangeListener getChangeListener(){
 		return changeListener;
 	}
 	

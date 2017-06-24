@@ -7,11 +7,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-public class AbstractFuture<V> implements IFuture<V> {
+public class AbstractFuture<V> implements Future<V> {
 
 	protected volatile Object result; 
  
-	protected Collection<IFutureListener<V>> listeners = new CopyOnWriteArrayList<IFutureListener<V>>();
+	protected Collection<FutureListener<V>> listeners = new CopyOnWriteArrayList<FutureListener<V>>();
 
 	private static final SuccessSignal SUCCESS_SIGNAL = new SuccessSignal();
 
@@ -97,7 +97,7 @@ public class AbstractFuture<V> implements IFuture<V> {
 	}
 
 	@Override
-	public IFuture<V> addListener(IFutureListener<V> listener) {
+	public Future<V> addListener(FutureListener<V> listener) {
 		if (listener == null) {
 			throw new NullPointerException("listener");
 		}
@@ -116,7 +116,7 @@ public class AbstractFuture<V> implements IFuture<V> {
 	}
 
 	@Override
-	public IFuture<V> removeListener(IFutureListener<V> listener) {
+	public Future<V> removeListener(FutureListener<V> listener) {
 		if (listener == null) {
 			throw new NullPointerException("listener");
 		}
@@ -129,12 +129,12 @@ public class AbstractFuture<V> implements IFuture<V> {
 	}
 
 	@Override
-	public IFuture<V> await() throws InterruptedException {
+	public Future<V> await() throws InterruptedException {
 		return await0(true);
 	}
 
 	
-	private IFuture<V> await0(boolean interruptable) throws InterruptedException {
+	private Future<V> await0(boolean interruptable) throws InterruptedException {
 		if (!isDone()) { 
 			if (interruptable && Thread.interrupted()) {
 				throw new InterruptedException("thread " + Thread.currentThread().getName() + " has been interrupted.");
@@ -227,7 +227,7 @@ public class AbstractFuture<V> implements IFuture<V> {
 	}
 
 	@Override
-	public IFuture<V> awaitUninterruptibly() {
+	public Future<V> awaitUninterruptibly() {
 		try {
 			return await0(false);
 		} catch (InterruptedException e) {
@@ -253,7 +253,7 @@ public class AbstractFuture<V> implements IFuture<V> {
 		}
 	}
 
-	protected IFuture<V> setFailure(Throwable cause) {
+	protected Future<V> setFailure(Throwable cause) {
 		if (setFailure0(cause)) {
 			notifyListeners();
 			return this;
@@ -277,7 +277,7 @@ public class AbstractFuture<V> implements IFuture<V> {
 		return true;
 	}
 
-	protected IFuture<V> setSuccess(Object result) {
+	protected Future<V> setSuccess(Object result) {
 		if (setSuccess0(result)) { 
 			notifyListeners();
 			return this;
@@ -305,12 +305,12 @@ public class AbstractFuture<V> implements IFuture<V> {
 	}
 
 	private void notifyListeners() {
-		for (IFutureListener<V> l : listeners) {
+		for (FutureListener<V> l : listeners) {
 			notifyListener(l);
 		}
 	}
 
-	private void notifyListener(IFutureListener<V> l) {
+	private void notifyListener(FutureListener<V> l) {
 		try {
 			l.operationCompleted(this);
 		} catch (Exception e) {

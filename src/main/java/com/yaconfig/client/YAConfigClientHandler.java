@@ -18,8 +18,7 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) {
-		client.consume(msg);
-		ReferenceCountUtil.release(msg);
+		client.consume(ctx.channel(),msg);
 	}
 	
 	@Override
@@ -36,4 +35,9 @@ public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		client.channelInactive(ctx.channel());
 	}
+	
+    @Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+        client.channelWritabilityChanged(ctx.channel());
+    }
 }

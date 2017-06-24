@@ -71,7 +71,7 @@ public class YAConfig{
 		//eps.add(new EndPoint("4244","127.0.0.1:4244"));
 		
 		ServerWatcher epWatcher = new ServerWatcher(YAConfig.SYSTEM_PERFIX + ".node..*");
-		epWatcher.setChangeListener(new IChangeListener(){
+		epWatcher.setChangeListener(new ChangeListener(){
 
 			@Override
 			public void onChange(String key,byte[] value,int type) {
@@ -90,7 +90,7 @@ public class YAConfig{
 		ws.addWatcher(epWatcher);
 		
 		ServerWatcher masterWatcher = new ServerWatcher(YAConfig.SYSTEM_PERFIX + ".master");
-		masterWatcher.setChangeListener(new IChangeListener(){
+		masterWatcher.setChangeListener(new ChangeListener(){
 
 			@Override
 			public void onChange(String key, byte[] value,int type) {
@@ -128,7 +128,7 @@ public class YAConfig{
 		
 		if(port == 4247){
 			server = new YAConfigServer(this);
-			Thread serverThread = new Thread("proposerThread"){
+			Thread serverThread = new Thread("serverThread"){
 				@Override
 				public void run(){
 					try {
@@ -149,7 +149,7 @@ public class YAConfig{
         
         
         ServerWatcher test = new ServerWatcher("com.test.test");
-		test.setChangeListener(new IChangeListener(){
+		test.setChangeListener(new ChangeListener(){
 
 			@Override
 			public void onChange(String key, byte[] value, int type) {
@@ -269,6 +269,10 @@ public class YAConfig{
 
 	public void setChannelId(String ip, int port,ChannelId id) {
 		eps.setChannelId(ip,port,id);
+	}
+
+	public boolean isServing() {
+		return STATUS == EndPoint.Status.FOLLOWING || STATUS == EndPoint.Status.LEADING;
 	}
 	
 }

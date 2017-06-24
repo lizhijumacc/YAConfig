@@ -1,7 +1,9 @@
 package com.yaconfig.server;
 
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.yaconfig.common.MessageProcessor;
 import com.yaconfig.server.commands.PutCommand;
 import com.yaconfig.server.message.YAServerMessage;
 import com.yaconfig.server.message.YAServerMessageDecoder;
@@ -33,6 +35,13 @@ public class YAConfigProposer extends MessageProcessor implements Runnable{
 	private YAConfig yaconfig;
 	
 	public YAConfigProposer(int port,YAConfig yaconfig){
+		this.port = port;
+		this.yaconfig = yaconfig;
+		unPomisedMsgs = new UnPromisedMessages(this);
+	}
+	
+	public YAConfigProposer(int port,YAConfig yaconfig,ThreadPoolExecutor prosseccer,int low,int high){
+		super(prosseccer,low,high);
 		this.port = port;
 		this.yaconfig = yaconfig;
 		unPomisedMsgs = new UnPromisedMessages(this);

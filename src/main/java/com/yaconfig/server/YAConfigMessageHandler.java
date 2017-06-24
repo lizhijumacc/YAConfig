@@ -1,5 +1,7 @@
 package com.yaconfig.server;
 
+import com.yaconfig.common.MessageProcessor;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
@@ -18,7 +20,7 @@ public class YAConfigMessageHandler extends ChannelInboundHandlerAdapter {
 	
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) {
-		processor.consume(msg);
+		processor.consume(ctx.channel(),msg);
 	}
 	
 	@Override
@@ -36,4 +38,8 @@ public class YAConfigMessageHandler extends ChannelInboundHandlerAdapter {
 		processor.channelInactive(ctx.channel());
 	}
 	
+	@Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+		processor.channelWritabilityChanged(ctx.channel());
+    }
 }

@@ -10,9 +10,9 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 
 public class YAConfigTestClientHandler extends ChannelInboundHandlerAdapter {
 
-	AppTest at;
+	ServerTest at;
 	
-	public YAConfigTestClientHandler(AppTest test) {
+	public YAConfigTestClientHandler(ServerTest test) {
 		at = test;
 	}
 

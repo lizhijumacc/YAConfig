@@ -2,9 +2,11 @@ package com.yaconfig.server;
 
 import java.net.InetSocketAddress;
 import java.util.Map.Entry;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.common.MessageProcessor;
 import com.yaconfig.server.message.YAServerMessage;
 import com.yaconfig.server.message.YAServerMessageDecoder;
 import com.yaconfig.server.message.YAServerMessageEncoder;
@@ -38,6 +40,12 @@ public class YAConfigAcceptor extends MessageProcessor implements Runnable{
 		loop = new NioEventLoopGroup();
 		this.yaconfig = yaconfig;
 	}
+	
+	public YAConfigAcceptor(YAConfig yaconfig,ThreadPoolExecutor prosseccer,int low,int high){
+		super(prosseccer,low,high);
+		loop = new NioEventLoopGroup();
+		this.yaconfig = yaconfig;
+	} 
 	
 	public void connect(final String ip,final int port){
 		

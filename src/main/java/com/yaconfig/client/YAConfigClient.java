@@ -1,5 +1,6 @@
 package com.yaconfig.client;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,16 +10,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.lang.reflect.Modifier;
 
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.message.YAMessageDecoder;
 import com.yaconfig.client.message.YAMessageEncoder;
 import com.yaconfig.client.message.YAMessageWrapper;
-import com.yaconfig.server.MessageProcessor;
+import com.yaconfig.common.MessageProcessor;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
@@ -46,15 +49,23 @@ public class YAConfigClient extends MessageProcessor{
 	
 	public static final int RECONNECT_WAIT = 5000;
 	
-	public static final int MAX_FUTURE_WAIT = 5000;
+	public static final int MAX_FUTURE_WAIT = 10000;
 	
-	private Object isWritable = new Object();
+	private static String SEPERATOR_TOKEN = ",";
 	
-	public YAConfigClient(String connStr){
+	public Object notifyConnected = new Object();
+	
+	private PackageScanner scanner;
+	
+	private String scanPackage;
+	
+	public YAConfigClient(String connStr,String scanPackage){
 		this.nodes = new ArrayList<Node>();
 		this.watchers = new HashMap<String,Watcher>();
 		this.myself = this;
 		this.connnectStr = connStr;
+		this.scanPackage = scanPackage;
+		this.scanner = new PackageScanner(this);
 		futures = new ConcurrentHashMap<Long,YAFuture<YAEntry>>();
 		
 		String[] split = connStr.split(",");
@@ -83,8 +94,15 @@ public class YAConfigClient extends MessageProcessor{
 			}
 			
 		},0, MAX_FUTURE_WAIT, TimeUnit.MILLISECONDS);
+		
+		scan();
 	}
 	
+	private void scan() {
+		String[] packageList = this.scanPackage.split(YAConfigClient.SEPERATOR_TOKEN);
+		this.scanner.scan(packageList);
+	}
+
 	protected void purgeFutures() {
 		for(Entry<Long,YAFuture<YAEntry>> e : futures.entrySet()){
 			YAFuture<YAEntry> f = e.getValue();
@@ -143,7 +161,7 @@ public class YAConfigClient extends MessageProcessor{
 		}else if(yamsg.getType() == YAMessage.Type.NACK){
 			YAFuture<YAEntry> f = futures.get(yamsg.getId());
 			if(f != null){
-				f.setFailure(new YAOperationErrorException("YAConfig operation error."));
+				f.setFailure(new YAOperationErrorException(new String(yamsg.getValue())));
 				futures.remove(yamsg.getId());
 			}
 		}
@@ -173,20 +191,17 @@ public class YAConfigClient extends MessageProcessor{
 		YAMessage yamsg = new YAMessage(type,key,bytes);
 		YAFuture<YAEntry> f = new YAFuture<YAEntry>();
 		futures.putIfAbsent(yamsg.getId(), f);
-		
-		if(checkChannel()){
-			produce(yamsg,channel.id());
-		}else{
-			try {
-				synchronized(isWritable){
-					isWritable.wait();
+		try {
+			while(channel == null){
+				synchronized(notifyConnected){
+					notifyConnected.wait();
 				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
 			}
-			
-			produce(yamsg,channel.id());
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
+		
+		produce(yamsg,channel.id());
 		
 		return f;
 	}
@@ -251,6 +266,7 @@ public class YAConfigClient extends MessageProcessor{
 				socket.setReuseAddress(true);
 				socket.connect(channel.remoteAddress());
 			} catch (IOException e) {
+				removeChannel(channel);
 				setChannel(null);
 				System.out.println("current server is inactive,try to connect another one.");
 			} finally {
@@ -261,10 +277,6 @@ public class YAConfigClient extends MessageProcessor{
 				}
 			}
 		}
-	}
-	
-	public boolean checkChannel(){
-		return channel != null && channel.isWritable() && channel.isActive();
 	}
 	
 	@Override
@@ -283,7 +295,9 @@ public class YAConfigClient extends MessageProcessor{
 	@Override
 	public void channelActive(Channel channel){
 		setChannel(channel);
-		notifyWritable();
+		synchronized(notifyConnected){
+			notifyConnected.notifyAll();
+		}
 		super.channelActive(channel);
 	}
 	
@@ -293,14 +307,28 @@ public class YAConfigClient extends MessageProcessor{
 		setChannel(null);
 		super.channelInactive(channel);
 	}
-	
-	public void notifyWritable(){
-		synchronized(isWritable){
-			isWritable.notifyAll();
+
+	public String getScanPackage() {
+		return scanPackage;
+	}
+
+	public void setScanPackage(String scanPackage) {
+		this.scanPackage = scanPackage;
+	}
+
+	public void injectValue(YAEntry yaEntry,Field feild) {
+		if(Modifier.isStatic(feild.getModifiers())){
+			feild.setAccessible(true);
+			try {
+				feild.set(feild.getClass(), new String(yaEntry.getValue()));
+			} catch (IllegalArgumentException | IllegalAccessException e) {
+				e.printStackTrace();
+			}
+		}else{
+			System.out.println("Config Field should be Static.");
 		}
 	}
-	
-	
+
 }
 
 
