@@ -1,5 +1,6 @@
 package com.yaconfig.client.injector;
 
+import java.lang.annotation.Annotation;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
@@ -66,8 +67,8 @@ public class ValueInjector implements FieldChangeCallback {
 		fields = reflections.getFieldsAnnotatedWith(RemoteValue.class);
 		Set<Method> befores = reflections.getMethodsAnnotatedWith(BeforeChange.class);
 		Set<Method> afters = reflections.getMethodsAnnotatedWith(AfterChange.class);
-		associate(fields,befores,beforeInjectMethods);
-		associate(fields,afters,afterInjectMethods);
+		associate(fields,befores,beforeInjectMethods,BeforeChange.class);
+		associate(fields,afters,afterInjectMethods,AfterChange.class);
 		
 		for(final Field field : fields){
 			RemoteValue annotation = field.getAnnotation(RemoteValue.class);
@@ -95,10 +96,21 @@ public class ValueInjector implements FieldChangeCallback {
 		}
 	}
 
-    private void associate(Set<Field> fields, Set<Method> methods, Map<Field, Set<Method>> map) {
+    private void associate(Set<Field> fields, Set<Method> methods, Map<Field, Set<Method>> map,Class<? extends Annotation> annotationClass) {
 		for(Field f : fields){
 			for(Method m : methods){
-				if(f.getDeclaringClass().equals(m.getDeclaringClass())){
+				String feildName;
+				Object anno = m.getAnnotation(annotationClass);
+				if(annotationClass.equals(BeforeChange.class)){
+					feildName = ((BeforeChange)anno).field();
+				}else if(annotationClass.equals(AfterChange.class)){
+					feildName = ((AfterChange)anno).field();
+				}else{
+					return;
+				}
+				
+				if(f.getDeclaringClass().equals(m.getDeclaringClass())
+						&& f.getName().equals(feildName)){
 					if(!map.containsKey(f)){
 						Set<Method> ms = new HashSet<Method>();
 						ms.add(m);

@@ -143,19 +143,17 @@ public class ServerTest
 		TestConfig conf = new TestConfig(yaclient);
     	for(int i=0;i<10;i++){
     		Thread.sleep(2000);
-    		YAFuture<YAEntry> f = yaclient.put("com.test." + (int)(Math.random()*5), 
+    		YAFuture<YAEntry> f = yaclient.put("com.test." + (int)(Math.random()*2), 
     				"878451".getBytes(), YAMessage.Type.PUT_NOPROMISE);
     		
     		f.addListener(new FutureListener<YAEntry>(){
 
 				@Override
 				public void operationCompleted(AbstractFuture<YAEntry> f) {
-					System.out.println("put success!");
+					//System.out.println("put success!");
 				}
     			
     		});
-    		
-    		System.out.println("TESTCONFIG VALUE: " + conf.value);
     		
     		/*if(i == 5){
     			yaclient.unwatch("com.test.*");
