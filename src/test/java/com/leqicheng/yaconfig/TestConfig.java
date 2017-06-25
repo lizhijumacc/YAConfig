@@ -4,6 +4,7 @@ import com.yaconfig.client.AbstractConfig;
 import com.yaconfig.client.YAConfigClient;
 import com.yaconfig.client.annotation.AfterChange;
 import com.yaconfig.client.annotation.BeforeChange;
+import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.RemoteValue;
 
 public class TestConfig extends AbstractConfig{
@@ -40,11 +41,26 @@ public class TestConfig extends AbstractConfig{
 	
 	@BeforeChange(field = "value2")
 	public void before3(){
-		System.out.println("(2)old value2 is:" + value2);
+		System.out.println("(3)old value2 is:" + value2);
 	}
 
 	@AfterChange(field = "value2")
 	public void after3(){
-		System.out.println("(2)new value2 is:" + value2);
+		System.out.println("(3)new value2 is:" + value2);
+	}
+	
+	@ControlChange(field = "value2")
+	public Boolean control4(String newValue){
+		System.out.println("(4)controlChange is:" + value2);
+		if(value2 != null && newValue.equals(value2)){
+			return false;
+		}
+		return true;
+	}
+	
+	@ControlChange(field = "value2")
+	public Boolean control5(String newValue){
+		System.out.println("(5)controlChange is always true");
+		return true;
 	}
 }

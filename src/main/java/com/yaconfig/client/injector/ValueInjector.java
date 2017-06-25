@@ -35,6 +35,7 @@ import com.yaconfig.client.YAConfigClient;
 import com.yaconfig.client.YAEntry;
 import com.yaconfig.client.annotation.AfterChange;
 import com.yaconfig.client.annotation.BeforeChange;
+import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.future.AbstractFuture;
 import com.yaconfig.client.future.YAFuture;
@@ -51,6 +52,7 @@ public class ValueInjector implements FieldChangeCallback {
 	private Set<Field> fields;
 	private Map<Field,Set<Method>> beforeInjectMethods;
 	private Map<Field,Set<Method>> afterInjectMethods;
+	private Map<Field,Set<Method>> controlInjectMethods;
 	
 	public ValueInjector(YAConfigClient client){
 		this.registry = new LinkedList<SoftReference<AbstractConfig>>();
@@ -58,6 +60,7 @@ public class ValueInjector implements FieldChangeCallback {
 		this.client = client;
 		this.beforeInjectMethods = new HashMap<Field,Set<Method>>();
 		this.afterInjectMethods = new HashMap<Field,Set<Method>>();
+		this.controlInjectMethods = new HashMap<Field,Set<Method>>();
 		myself = this;
 	}
 	
@@ -67,8 +70,10 @@ public class ValueInjector implements FieldChangeCallback {
 		fields = reflections.getFieldsAnnotatedWith(RemoteValue.class);
 		Set<Method> befores = reflections.getMethodsAnnotatedWith(BeforeChange.class);
 		Set<Method> afters = reflections.getMethodsAnnotatedWith(AfterChange.class);
+		Set<Method> controls = reflections.getMethodsAnnotatedWith(ControlChange.class);
 		associate(fields,befores,beforeInjectMethods,BeforeChange.class);
 		associate(fields,afters,afterInjectMethods,AfterChange.class);
+		associate(fields,controls,controlInjectMethods,ControlChange.class);
 		
 		for(final Field field : fields){
 			RemoteValue annotation = field.getAnnotation(RemoteValue.class);
@@ -99,18 +104,20 @@ public class ValueInjector implements FieldChangeCallback {
     private void associate(Set<Field> fields, Set<Method> methods, Map<Field, Set<Method>> map,Class<? extends Annotation> annotationClass) {
 		for(Field f : fields){
 			for(Method m : methods){
-				String feildName;
+				String fieldName;
 				Object anno = m.getAnnotation(annotationClass);
 				if(annotationClass.equals(BeforeChange.class)){
-					feildName = ((BeforeChange)anno).field();
+					fieldName = ((BeforeChange)anno).field();
 				}else if(annotationClass.equals(AfterChange.class)){
-					feildName = ((AfterChange)anno).field();
+					fieldName = ((AfterChange)anno).field();
+				}else if(annotationClass.equals(ControlChange.class)){
+					fieldName = ((ControlChange)anno).field();
 				}else{
 					return;
 				}
 				
 				if(f.getDeclaringClass().equals(m.getDeclaringClass())
-						&& f.getName().equals(feildName)){
+						&& f.getName().equals(fieldName)){
 					if(!map.containsKey(f)){
 						Set<Method> ms = new HashSet<Method>();
 						ms.add(m);
@@ -222,22 +229,46 @@ public class ValueInjector implements FieldChangeCallback {
 		}
 	}
 
-	private void inject(Object obj, Field field, String value) {
-		field.setAccessible(true);
-		invokeMethods(this.beforeInjectMethods,field,obj);
-		try {
-			field.set(obj, value);
-		} catch (IllegalArgumentException | IllegalAccessException e) {
-			e.printStackTrace();
+	private void inject(Object obj, Field field, Object newValue) {
+		boolean accept = true;
+		if(this.controlInjectMethods.containsKey(field)){
+			Set<Method> ms = this.controlInjectMethods.get(field);
+			for(Method m : ms){
+				try {
+					Object res;
+					res = m.invoke(obj,newValue);
+					if(res != null && res instanceof Boolean){
+						Boolean isAccept = (Boolean)res;
+						accept = isAccept.booleanValue();
+						if(!accept){
+							break;
+						}
+					}
+					
+				} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+					e.printStackTrace();
+				}
+			}
+			
+
 		}
-		invokeMethods(this.afterInjectMethods,field,obj);
+		
+		if(accept){
+			invokeMethods(this.beforeInjectMethods,field,obj);
+			try {
+				field.set(obj, newValue);
+			} catch (IllegalArgumentException | IllegalAccessException e) {
+				e.printStackTrace();
+			}
+			invokeMethods(this.afterInjectMethods,field,obj);
+		}
 	}
 
-	private void invokeMethods(Map<Field, Set<Method>> methods, Field field, Object obj) {
-		if(!methods.containsKey(field)){
+	private void invokeMethods(Map<Field, Set<Method>> maps,Field field, Object obj) {
+		if(!maps.containsKey(field)){
 			return;
 		}else{
-			Set<Method> ms = methods.get(field);
+			Set<Method> ms = maps.get(field);
 			for(Method m : ms){
 				try {
 					m.invoke(obj);
