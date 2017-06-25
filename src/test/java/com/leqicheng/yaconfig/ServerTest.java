@@ -5,13 +5,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.yaconfig.client.AbstractFuture;
-import com.yaconfig.client.FutureListener;
 import com.yaconfig.client.Watcher;
 import com.yaconfig.client.YAConfigClient;
-import com.yaconfig.client.YAConfigValue;
 import com.yaconfig.client.YAEntry;
-import com.yaconfig.client.YAFuture;
+import com.yaconfig.client.annotation.RemoteValue;
+import com.yaconfig.client.future.AbstractFuture;
+import com.yaconfig.client.future.FutureListener;
+import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.WatcherListener;
 import com.yaconfig.client.message.YAMessage;
 
@@ -110,7 +110,7 @@ public class ServerTest
     	yaclient = new YAConfigClient("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890",
     				ServerTest.class.getPackage().getName());
     	
-		yaclient.watch("com.test.*", new WatcherListener(){
+		/*yaclient.watch("com.test.*", new WatcherListener(){
 
 			@Override
 			public void onDelete(Watcher w,String key) {
@@ -138,13 +138,13 @@ public class ServerTest
 				});
 			}
 			
-		});    
+		});*/
     	
 		TestConfig conf = new TestConfig(yaclient);
     	for(int i=0;i<10;i++){
     		Thread.sleep(2000);
     		YAFuture<YAEntry> f = yaclient.put("com.test." + (int)(Math.random()*5), 
-    				"5656565".getBytes(), YAMessage.Type.PUT_NOPROMISE);
+    				"878451".getBytes(), YAMessage.Type.PUT_NOPROMISE);
     		
     		f.addListener(new FutureListener<YAEntry>(){
 

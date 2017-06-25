@@ -15,6 +15,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.lang.reflect.Modifier;
 
+import com.yaconfig.client.exceptions.YAFutureTimeoutException;
+import com.yaconfig.client.exceptions.YAOperationErrorException;
+import com.yaconfig.client.exceptions.YAServerDeadException;
+import com.yaconfig.client.future.YAFuture;
+import com.yaconfig.client.injector.ValueInjector;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.message.YAMessageDecoder;
 import com.yaconfig.client.message.YAMessageEncoder;
@@ -59,13 +64,9 @@ public class YAConfigClient extends MessageProcessor{
 	
 	public Object notifyConnected = new Object();
 	
-	private PackageScanner scanner;
+	private ValueInjector injector;
 	
 	private String scanPackage;
-	
-	private List<SoftReference<AbstractConfig>> registry;
-	
-	public ReferenceQueue<? super AbstractConfig> queue;
 	
 	public YAConfigClient(String connStr,String scanPackage){
 		this.nodes = new ArrayList<Node>();
@@ -73,9 +74,7 @@ public class YAConfigClient extends MessageProcessor{
 		this.myself = this;
 		this.connnectStr = connStr;
 		this.scanPackage = scanPackage;
-		this.scanner = new PackageScanner(this);
-		this.registry = new LinkedList<SoftReference<AbstractConfig>>();
-		this.queue = new ReferenceQueue();
+		this.injector = new ValueInjector(this);
 		futures = new ConcurrentHashMap<Long,YAFuture<YAEntry>>();
 		
 		String[] split = connStr.split(",");
@@ -109,27 +108,13 @@ public class YAConfigClient extends MessageProcessor{
 
 			@Override
 			public void run() {
-				purgeSoftQueue();
+				injector.purgeSoftQueue();
 			}
 			
 		},200, SOFT_GC_INTERVAL, TimeUnit.MILLISECONDS);
 		
-		scan();
-	}
-	
-	protected void purgeSoftQueue() {
-		while(true){  
-	        Object softRef = queue.poll();  
-	        if(softRef == null){  
-	                break;  
-	        }  
-	        registry.remove(softRef);  
-		}  
-	}
-
-	private void scan() {
 		String[] packageList = this.scanPackage.split(YAConfigClient.SEPERATOR_TOKEN);
-		this.scanner.scan(packageList);
+		this.injector.scan(packageList);
 	}
 
 	protected void purgeFutures() {
@@ -344,37 +329,9 @@ public class YAConfigClient extends MessageProcessor{
 	public void setScanPackage(String scanPackage) {
 		this.scanPackage = scanPackage;
 	}
-
-	public void injectValue(YAEntry yaEntry,Field feild) {
-		feild.setAccessible(true);
-		if(Modifier.isStatic(feild.getModifiers())){
-			try {
-				feild.set(feild.getClass(), new String(yaEntry.getValue()));
-			} catch (IllegalArgumentException | IllegalAccessException e) {
-				e.printStackTrace();
-			}
-		} else {
-			final Class<?> clazz = feild.getDeclaringClass();
-			
-			synchronized(registry){
-				for(SoftReference<AbstractConfig> config : registry){
-					
-					if(clazz.equals(config.get().getClass())){
-						try {
-							feild.set(config.get(), new String(yaEntry.getValue()));
-						} catch (IllegalArgumentException | IllegalAccessException e) {
-							e.printStackTrace();
-						}
-					}
-				}
-			}
-		}
-	}
 	
-	public void registerConfig(SoftReference<AbstractConfig> config){
-		synchronized(registry){
-			registry.add(config);
-		}
+	public void registerConfig(AbstractConfig config){
+		injector.register(config);
 	}
 
 }
