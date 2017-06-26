@@ -59,10 +59,10 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 	}
 	
 	public void produce(Object msg,final ChannelId id){
-		if(id == null || msg == null || channels.get(id) == null){
+		if(id == null || msg == null){
 			return;
 		}
-	
+
 		while(!checkChannel(channels.get(id))){
 			try {
 				if(channels.get(id) != null){
@@ -75,7 +75,7 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 				e.printStackTrace();
 			}
 		}
-		
+
 		channels.get(id).writeAndFlush(msg);
 	}
 

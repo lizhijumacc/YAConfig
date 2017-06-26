@@ -1,20 +1,14 @@
 package com.yaconfig.client;
 import java.io.IOException;
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.SoftReference;
-import java.lang.reflect.Field;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.lang.reflect.Modifier;
 
 import com.yaconfig.client.exceptions.YAFutureTimeoutException;
 import com.yaconfig.client.exceptions.YAOperationErrorException;
@@ -192,6 +186,7 @@ public class YAConfigClient extends MessageProcessor{
 
 	public YAFuture<YAEntry> watch(String key,WatcherListener... listeners){
 		watchLocal(key,listeners);
+		System.out.println("watch!!!!!!!!!!");
 		return writeCommand(key,"".getBytes(),YAMessage.Type.WATCH);
 	}
 	
@@ -217,7 +212,6 @@ public class YAConfigClient extends MessageProcessor{
 		}
 		
 		produce(yamsg,channel.id());
-		
 		return f;
 	}
 	

@@ -5,6 +5,7 @@ import com.yaconfig.client.YAConfigClient;
 import com.yaconfig.client.annotation.AfterChange;
 import com.yaconfig.client.annotation.BeforeChange;
 import com.yaconfig.client.annotation.ControlChange;
+import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.annotation.RemoteValue;
 
 public class TestConfig extends AbstractConfig{
@@ -14,6 +15,9 @@ public class TestConfig extends AbstractConfig{
 	
 	@RemoteValue(key = "com.test.1")
 	public String value2;
+	
+	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
+	public String value3;
 	
 	public TestConfig(YAConfigClient client) {
 		super(client);
@@ -62,5 +66,15 @@ public class TestConfig extends AbstractConfig{
 	public Boolean control5(String newValue){
 		System.out.println("(5)controlChange is always true");
 		return true;
+	}
+	
+	@BeforeChange(field = "value3")
+	public void before6(){
+		System.out.println("(6)old value3 is:" + value3);
+	}
+
+	@AfterChange(field = "value3")
+	public void after6(){
+		System.out.println("(6)new value1 is:" + value3);
 	}
 }
