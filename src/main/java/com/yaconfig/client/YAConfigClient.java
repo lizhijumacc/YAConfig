@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.yaconfig.client.exceptions.YAException;
 import com.yaconfig.client.exceptions.YAFutureTimeoutException;
 import com.yaconfig.client.exceptions.YAOperationErrorException;
 import com.yaconfig.client.exceptions.YAServerDeadException;
@@ -37,7 +38,7 @@ public class YAConfigClient extends MessageProcessor{
 	
 	private volatile Channel channel; 
 	
-	private String connnectStr;
+	private volatile String connnectStr;
 	
 	private List<Node> nodes;
 	
@@ -61,24 +62,61 @@ public class YAConfigClient extends MessageProcessor{
 	
 	private ValueInjector injector;
 	
-	private String scanPackage;
+	private static YAConfigClient instance;
 	
-	public YAConfigClient(String connStr,String scanPackage){
-		this.nodes = new ArrayList<Node>();
+	private YAConfigClient(){
 		this.watchers = new HashMap<String,Watcher>();
-		this.myself = this;
-		this.connnectStr = connStr;
-		this.scanPackage = scanPackage;
 		this.injector = new ValueInjector(this);
-		futures = new ConcurrentHashMap<Long,YAFuture<YAEntry>>();
+		this.myself = this;
+	}
+	
+	public static YAConfigClient getInstance(){
+		if(instance == null){
+			synchronized(YAConfigClient.class){
+				if(instance == null){
+					instance = new YAConfigClient();
+				}
+			}
+		}
 		
-		String[] split = connStr.split(",");
+		return instance;
+	}
+	
+	public void scanPackage(String scanPackage){
+		this.injector.scan(scanPackage.split(YAConfigClient.SEPERATOR_TOKEN));
+	}
+	
+	public YAConfigClient attach(String connStr){
+		//should not change the connectStr
+		if(this.connnectStr != null){
+			return this;
+		}
+		this.connnectStr = connStr;
+		futures = new ConcurrentHashMap<Long,YAFuture<YAEntry>>();
+		this.nodes = new ArrayList<Node>();
+		
+		connectYAServer();
+		return this;
+	}
+	
+	public YAConfigClient detach(){
+		if(this.connnectStr == null){
+			return this;
+		}
+		
+		this.connnectStr = null;
+		this.nodes = null;
+		failAllFuture();
+		channel.close();
+		
+		return this;
+	}
+
+	public void connectYAServer(){
+		String[] split = this.connnectStr.split(",");
 		for(String s : split){
 			nodes.add(new Node(s));
 		}
-		
-		String[] packageList = this.scanPackage.split(YAConfigClient.SEPERATOR_TOKEN);
-		this.injector.scan(packageList);
 		
 		scheduleTask = Executors.newSingleThreadScheduledExecutor();
 		scheduleTask.scheduleAtFixedRate(new Runnable(){
@@ -110,9 +148,8 @@ public class YAConfigClient extends MessageProcessor{
 			}
 			
 		},200, SOFT_GC_INTERVAL, TimeUnit.MILLISECONDS);
-		
 	}
-
+	
 	protected void purgeFutures() {
 		for(Entry<Long,YAFuture<YAEntry>> e : futures.entrySet()){
 			YAFuture<YAEntry> f = e.getValue();
@@ -125,7 +162,7 @@ public class YAConfigClient extends MessageProcessor{
 
 	protected void failAllFuture() {
 		for(YAFuture<YAEntry> f : futures.values()){
-			f.setFailure(new YAServerDeadException("Server Closed. Reconnecting..."));
+			f.setFailure(new YAServerDeadException("Server Detached."));
 		}
 		futures.clear();
 	}
@@ -204,6 +241,12 @@ public class YAConfigClient extends MessageProcessor{
 	}
 	
 	private YAFuture<YAEntry> writeCommand(String key, byte[] bytes, int type) {
+		if(futures == null){
+			YAFuture<YAEntry> ref = new YAFuture<YAEntry>();
+			ref.setFailure(new YAException("YAConfig in running in Local mode."));
+			return ref;
+		}
+		
 		YAMessage yamsg = new YAMessage(type,key,bytes);
 		YAFuture<YAEntry> f = new YAFuture<YAEntry>();
 		futures.putIfAbsent(yamsg.getId(), f);
@@ -325,14 +368,6 @@ public class YAConfigClient extends MessageProcessor{
 		channel.close();
 		setChannel(null);
 		super.channelInactive(channel);
-	}
-
-	public String getScanPackage() {
-		return scanPackage;
-	}
-
-	public void setScanPackage(String scanPackage) {
-		this.scanPackage = scanPackage;
 	}
 	
 	public void registerConfig(AbstractConfig config){

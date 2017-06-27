@@ -1,6 +1,6 @@
 package com.yaconfig.client.injector;
 
-public enum DataFrom {
+public enum AnchorType {
 	REMOTE,
 	FILE
 }

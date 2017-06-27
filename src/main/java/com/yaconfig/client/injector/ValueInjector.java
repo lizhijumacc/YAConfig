@@ -3,8 +3,10 @@ package com.yaconfig.client.injector;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.lang.annotation.Annotation;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
@@ -13,6 +15,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,14 +38,17 @@ import org.reflections.util.ConfigurationBuilder;
 import org.reflections.util.FilterBuilder;
 
 import com.google.common.base.Predicate;
+import com.google.common.io.Files;
 import com.yaconfig.client.AbstractConfig;
 import com.yaconfig.client.Constants;
 import com.yaconfig.client.YAConfigClient;
 import com.yaconfig.client.YAEntry;
 import com.yaconfig.client.annotation.AfterChange;
+import com.yaconfig.client.annotation.Anchor;
 import com.yaconfig.client.annotation.BeforeChange;
 import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.FileValue;
+import com.yaconfig.client.annotation.InitValueFrom;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.future.AbstractFuture;
 import com.yaconfig.client.future.YAFuture;
@@ -79,12 +85,17 @@ public class ValueInjector implements FieldChangeCallback {
 		fields = reflections.getFieldsAnnotatedWith(RemoteValue.class);
 		registerFields(fields,reflections);
 		
+		//remote values
 		for(final Field field : fields){
 			RemoteValue annotation = field.getAnnotation(RemoteValue.class);
 			String key = annotation.key();
-			client.watchLocal(key,new RemoteFieldChangeListener(field,this));
+			Anchor anchor = field.getAnnotation(Anchor.class);
+			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
+				client.watchLocal(key,new RemoteFieldChangeListener(field,this));
+			}
 		}
 		
+		//file values
 		fields = reflections.getFieldsAnnotatedWith(FileValue.class);
 		if(fields.size() != 0){
 			fileWatcher = new FileWatcher(this);
@@ -94,17 +105,47 @@ public class ValueInjector implements FieldChangeCallback {
 				String path = Paths.get(path_r).toAbsolutePath().toString();
 				String key = field.getAnnotation(FileValue.class).key();
 				try {
-					//first inject into static field
-					onAdd(path + "@" + key, field,DataFrom.FILE);
-					fileWatcher.registerWatcher(path, key, field);
+					Anchor anchor = field.getAnnotation(Anchor.class);
+					if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.FILE)){
+						fileWatcher.registerWatcher(path, key, field);
+					}
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
 		}
+		
+		//define initial values
+		fields = reflections.getFieldsAnnotatedWith(InitValueFrom.class);
+		for(Field field : fields){
+			initSetValue(field);
+		}
 	}
 
-    private void registerFields(Set<Field> fields, Reflections reflections) {
+    private void initSetValue(Field field) {
+    	InitValueFrom df = field.getAnnotation(InitValueFrom.class);
+    	if(df == null){
+    		return;
+    	}
+
+		if(df.from().equals(DataFrom.FILE)){
+			FileValue fv = field.getAnnotation(FileValue.class);
+			if(fv != null){
+				String path_r = field.getAnnotation(FileValue.class).path();
+				String path = Paths.get(path_r).toAbsolutePath().toString();
+				String key = field.getAnnotation(FileValue.class).key();
+				fetchAndInjectNewValue(path + "@" + key, field, DataFrom.FILE);
+			}
+		}else if(df.from().equals(DataFrom.REMOTE)){
+			RemoteValue rv = field.getAnnotation(RemoteValue.class);
+			if(rv != null){
+				String key = rv.key();
+				fetchAndInjectNewValue(key, field, DataFrom.REMOTE);
+			}
+		}
+	}
+
+	private void registerFields(Set<Field> fields, Reflections reflections) {
 		Set<Method> befores = reflections.getMethodsAnnotatedWith(BeforeChange.class);
 		Set<Method> afters = reflections.getMethodsAnnotatedWith(AfterChange.class);
 		Set<Method> controls = reflections.getMethodsAnnotatedWith(ControlChange.class);
@@ -173,12 +214,23 @@ public class ValueInjector implements FieldChangeCallback {
 
 	@Override
 	public void onAdd(String key, Field field, DataFrom from) {
-		fetchAndInjectNewValue(key,field,from);
+		onUpdate(key,field,from);
 	}
 
 	@Override
 	public void onUpdate(String key, Field field, DataFrom from) {
-		fetchAndInjectNewValue(key,field,from);
+		Anchor anno = field.getAnnotation(Anchor.class);
+		if(anno == null){
+			fetchAndInjectNewValue(key,field,from);
+		}else{
+			AnchorType type = anno.anchor();
+			if(from.equals(DataFrom.REMOTE) && type.equals(AnchorType.REMOTE)
+					|| from.equals(DataFrom.FILE) && type.equals(AnchorType.FILE)){
+				fetchAndInjectNewValue(key,field,from);
+			}else{
+				return;
+			}
+		}
 	}
 
 	@Override
@@ -190,7 +242,7 @@ public class ValueInjector implements FieldChangeCallback {
 		}
 	}
 	
-	private void fetchAndInjectNewValue(String key,final Field field,DataFrom from){
+	private void fetchAndInjectNewValue(final String key,final Field field,DataFrom from){
 		if(from.equals(DataFrom.REMOTE)){
 			YAFuture<YAEntry> f = client.get(key, YAMessage.Type.GET_LOCAL);
 			f.addListener(new YAFutureListener(key){
@@ -204,34 +256,131 @@ public class ValueInjector implements FieldChangeCallback {
 								| ExecutionException e) {
 							e.printStackTrace();
 						}
+						
+						final FileValue fv = field.getAnnotation(FileValue.class);
+						if(fv != null){
+							Anchor anchor = field.getAnnotation(Anchor.class);
+							if(anchor != null && anchor.anchor().equals(AnchorType.FILE)){
+								return;
+							}
+							
+							try {
+								writeValueToFile(Paths.get(fv.path()).toAbsolutePath(),fv.key(),new String(future.get().getValue()));
+							} catch (IllegalArgumentException | InterruptedException
+									| ExecutionException e) {
+								e.printStackTrace();
+							}
+						}
+						
 					}
 				}
 				
 			});
 		}else if(from.equals(DataFrom.FILE)){
-			injectValue(readValueFromFile(key),field);
+			String value = readValueFromFile(key);
+			injectValue(value,field);
+			RemoteValue rv = field.getAnnotation(RemoteValue.class);
+			if(rv != null){
+				Anchor anchor = field.getAnnotation(Anchor.class);
+				if(anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
+					return;
+				}
+				client.put(rv.key(), value.getBytes(), YAMessage.Type.PUT_NOPROMISE);
+			}
 		}
 
 	}
 
-	private String readValueFromFile(String key) {
+	private synchronized void writeValueToFile(Path path, String key,String value) {
+		File thefile = path.toFile();
+		OutputStreamWriter writer = null;
+		InputStreamReader reader = null;
+		BufferedReader bufferedReader = null;
+		try {
+			if(thefile.exists()){
+				reader = new InputStreamReader(new FileInputStream(thefile));
+				bufferedReader = new BufferedReader(reader);
+				File tmpfile = new File(path + ".yatmp" + System.nanoTime());
+				writer = new OutputStreamWriter(new FileOutputStream(tmpfile));
+				
+				String line = null;
+				while((line = bufferedReader.readLine()) != null){
+					if(line.contains("=")){
+						String name = line.substring(0,line.lastIndexOf('='));
+						if(name.equalsIgnoreCase(key)){
+							writer.write(key + "=" + value + "\r");
+						}else{
+							writer.write(line + "\r");
+						}
+					}else{
+						writer.write(line + "\r");
+					}
+				}
+				writer.flush();
+				reader.close();
+				bufferedReader.close();
+				writer.close();
+				
+				if(thefile.delete()){
+					Files.copy(new File(tmpfile.getAbsolutePath()), new File(thefile.getAbsolutePath()));
+					tmpfile.delete();
+				}
+			}else{
+				thefile.createNewFile();
+				writer = new OutputStreamWriter(new FileOutputStream(thefile));
+				writer.write(key + "=" + value);
+				writer.flush();
+			}
+		}catch (IOException e) {
+			e.printStackTrace();
+		}finally{
+			if(writer != null){
+				try {
+					writer.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			if(reader != null){
+				try {
+					reader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			if(bufferedReader != null){
+				try {
+					bufferedReader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+	}
+	
+	private synchronized String readValueFromFile(String key) {
 		String path = key.substring(0,key.lastIndexOf('@'));
 		String filedName = key.substring(key.lastIndexOf('@') + 1);
 		File file = Paths.get(path).toAbsolutePath().toFile();
 		BufferedReader bufferedReader = null;
+		InputStreamReader reader = null;
+		System.out.println("read from file!!!!!!!!!!!!!!!!!");
 		if(file.isFile() && file.exists()){
 			try {
-				InputStreamReader read = new InputStreamReader(new FileInputStream(file));
-				bufferedReader = new BufferedReader(read);
+				reader = new InputStreamReader(new FileInputStream(file));
+				bufferedReader = new BufferedReader(reader);
 				String line = null;
 				while((line = bufferedReader.readLine()) != null){
 					if(line.contains("=")){
 						String name = line.substring(0,line.lastIndexOf('='));
 						String value = line.substring(line.lastIndexOf('=') + 1);
 						if(name.equalsIgnoreCase(filedName)){
-							return value;
+							return value == null ? "" : value;
 						}
 					}
+					
+					System.out.println(line);
 				}
 				
 			} catch (IOException e) {
@@ -240,6 +389,13 @@ public class ValueInjector implements FieldChangeCallback {
 				if(bufferedReader != null){
 					try {
 						bufferedReader.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				if(reader != null){
+					try {
+						reader.close();
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -254,17 +410,10 @@ public class ValueInjector implements FieldChangeCallback {
 		synchronized(registry){
 			registry.add(new SoftReference<AbstractConfig>(config,this.queue));
 		}
-		
-		//first inject into object
+
 		Field[] fs = config.getClass().getFields();
 		for(Field f : fs){
-			FileValue fv = f.getAnnotation(FileValue.class);
-			if(fv != null){
-				String path_r = fv.path();
-				String path = Paths.get(path_r).toAbsolutePath().toString();
-				String key = fv.key();
-				onAdd(path + "@" + key, f,DataFrom.FILE);
-			}
+			initSetValue(f);
 		}
 	}
 	
