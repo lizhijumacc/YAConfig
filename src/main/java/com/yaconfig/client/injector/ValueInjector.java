@@ -82,26 +82,7 @@ public class ValueInjector implements FieldChangeCallback {
 		for(final Field field : fields){
 			RemoteValue annotation = field.getAnnotation(RemoteValue.class);
 			String key = annotation.key();
-			YAFuture<YAEntry> f = client.watch(key,new RemoteFieldChangeListener(field,this));
-			
-			f.addListener(new YAFutureListener(key){
-
-				@Override
-				public void operationCompleted(AbstractFuture<YAEntry> future) {
-					if(!future.isSuccess()){
-						System.out.println("Watch KEY:" + this.getKey() + " ERROR in scanning.");
-						try {
-							future.get();
-						} catch (InterruptedException | ExecutionException e) {
-							System.out.println(e.getCause().getMessage());
-						}
-					}else{
-						System.out.println("Watch KEY:" + this.getKey() + " successfully in scanning.");
-					}
-				}
-				
-			});
-
+			client.watchLocal(key,new RemoteFieldChangeListener(field,this));
 		}
 		
 		fields = reflections.getFieldsAnnotatedWith(FileValue.class);

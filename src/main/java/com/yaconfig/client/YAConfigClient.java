@@ -77,6 +77,9 @@ public class YAConfigClient extends MessageProcessor{
 			nodes.add(new Node(s));
 		}
 		
+		String[] packageList = this.scanPackage.split(YAConfigClient.SEPERATOR_TOKEN);
+		this.injector.scan(packageList);
+		
 		scheduleTask = Executors.newSingleThreadScheduledExecutor();
 		scheduleTask.scheduleAtFixedRate(new Runnable(){
 
@@ -108,8 +111,6 @@ public class YAConfigClient extends MessageProcessor{
 			
 		},200, SOFT_GC_INTERVAL, TimeUnit.MILLISECONDS);
 		
-		String[] packageList = this.scanPackage.split(YAConfigClient.SEPERATOR_TOKEN);
-		this.injector.scan(packageList);
 	}
 
 	protected void purgeFutures() {
@@ -185,9 +186,14 @@ public class YAConfigClient extends MessageProcessor{
 	}
 
 	public YAFuture<YAEntry> watch(String key,WatcherListener... listeners){
-		watchLocal(key,listeners);
-		System.out.println("watch!!!!!!!!!!");
-		return writeCommand(key,"".getBytes(),YAMessage.Type.WATCH);
+		boolean res = watchLocal(key,listeners);
+		if(res){
+			return writeCommand(key,"".getBytes(),YAMessage.Type.WATCH);
+		}else{
+			YAFuture<YAEntry> ref = new YAFuture<YAEntry>();
+			ref.setSuccess(key);
+			return ref;
+		} 
 	}
 	
 	public YAFuture<YAEntry> unwatch(final String key){
@@ -201,6 +207,7 @@ public class YAConfigClient extends MessageProcessor{
 		YAMessage yamsg = new YAMessage(type,key,bytes);
 		YAFuture<YAEntry> f = new YAFuture<YAEntry>();
 		futures.putIfAbsent(yamsg.getId(), f);
+		
 		try {
 			while(channel == null){
 				synchronized(notifyConnected){
@@ -215,9 +222,10 @@ public class YAConfigClient extends MessageProcessor{
 		return f;
 	}
 	
-	private void watchLocal(String key,WatcherListener... listeners){
+	public boolean watchLocal(String key,WatcherListener... listeners){
 		if(watchers.containsKey(key)){
 			watchers.get(key).addListeners(listeners);
+			return false;
 		}else{
 			Watcher watcher = new Watcher(key,channel);
 			watcher.addListeners(listeners);
@@ -225,6 +233,8 @@ public class YAConfigClient extends MessageProcessor{
 				watchers.put(key, watcher);
 			}
 		}
+		
+		return true;
 	}
 	
 	public void setChannel(Channel channel){
@@ -303,11 +313,11 @@ public class YAConfigClient extends MessageProcessor{
 	
 	@Override
 	public void channelActive(Channel channel){
+		super.channelActive(channel);
 		setChannel(channel);
 		synchronized(notifyConnected){
 			notifyConnected.notifyAll();
 		}
-		super.channelActive(channel);
 	}
 	
 	@Override

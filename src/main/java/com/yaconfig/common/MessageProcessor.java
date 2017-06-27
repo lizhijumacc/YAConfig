@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelId;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
 
 public abstract class MessageProcessor extends ChannelContainer implements MessageProducer,MessageConsumer{
@@ -75,7 +76,7 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 				e.printStackTrace();
 			}
 		}
-
+		
 		channels.get(id).writeAndFlush(msg);
 	}
 
@@ -91,7 +92,19 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 
 	public void channelWritabilityChanged(Channel c) {
 		Channel channel = channels.get(c.id());
-		if(checkChannel(channel)){
+		synchronized(channel){
+			if(checkChannel(channel)){
+				channel.notifyAll();
+			}
+		}
+	}
+	
+	@Override
+	public void channelActive(Channel channel){
+		super.channelActive(channel);
+		//wait until channel is writable
+		synchronized(channel){
+			while(!channel.isWritable()){}
 			channel.notifyAll();
 		}
 	}
