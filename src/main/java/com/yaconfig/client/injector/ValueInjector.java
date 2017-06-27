@@ -127,7 +127,7 @@ public class ValueInjector implements FieldChangeCallback {
     	if(df == null){
     		return;
     	}
-
+System.out.println("bugbugbugbug");
 		if(df.from().equals(DataFrom.FILE)){
 			FileValue fv = field.getAnnotation(FileValue.class);
 			if(fv != null){
@@ -285,7 +285,12 @@ public class ValueInjector implements FieldChangeCallback {
 				if(anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
 					return;
 				}
-				client.put(rv.key(), value.getBytes(), YAMessage.Type.PUT_NOPROMISE);
+				if(value != null){
+					client.put(rv.key(), value.getBytes(), YAMessage.Type.PUT_NOPROMISE);
+				}else{
+					//TODO:should remove the key on server?
+					client.put(rv.key(), "".getBytes(), YAMessage.Type.PUT_NOPROMISE);
+				}
 			}
 		}
 
@@ -361,26 +366,30 @@ public class ValueInjector implements FieldChangeCallback {
 	
 	private synchronized String readValueFromFile(String key) {
 		String path = key.substring(0,key.lastIndexOf('@'));
-		String filedName = key.substring(key.lastIndexOf('@') + 1);
+		String fieldName = key.substring(key.lastIndexOf('@') + 1);
 		File file = Paths.get(path).toAbsolutePath().toFile();
 		BufferedReader bufferedReader = null;
 		InputStreamReader reader = null;
-		System.out.println("read from file!!!!!!!!!!!!!!!!!");
 		if(file.isFile() && file.exists()){
 			try {
 				reader = new InputStreamReader(new FileInputStream(file));
 				bufferedReader = new BufferedReader(reader);
-				String line = null;
-				while((line = bufferedReader.readLine()) != null){
-					if(line.contains("=")){
-						String name = line.substring(0,line.lastIndexOf('='));
-						String value = line.substring(line.lastIndexOf('=') + 1);
-						if(name.equalsIgnoreCase(filedName)){
-							return value == null ? "" : value;
+				String line = bufferedReader.readLine();
+				if(line != null){
+					do{
+						String retValue = getValueFromLine(line,fieldName);
+						if(retValue != null){
+							return retValue;
+						}
+					}while((line = bufferedReader.readLine()) != null);
+				}else{
+					//may be BufferedReader bug, read next line.
+					while((line = bufferedReader.readLine()) != null){
+						String retValue = getValueFromLine(line,fieldName);
+						if(retValue != null){
+							return retValue;
 						}
 					}
-					
-					System.out.println(line);
 				}
 				
 			} catch (IOException e) {
@@ -403,6 +412,17 @@ public class ValueInjector implements FieldChangeCallback {
 			}
 		}
 		
+		return null;
+	}
+
+	private String getValueFromLine(String line,String fieldName) {
+		if(line.contains("=")){
+			String name = line.substring(0,line.lastIndexOf('='));
+			String value = line.substring(line.lastIndexOf('=') + 1);
+			if(name.equalsIgnoreCase(fieldName)){
+				return value == null ? "" : value;
+			}
+		}
 		return null;
 	}
 
