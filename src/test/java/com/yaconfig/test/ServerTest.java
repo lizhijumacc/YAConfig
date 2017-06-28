@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.yaconfig.client.ConfigFactory;
 import com.yaconfig.client.Watcher;
 import com.yaconfig.client.YAConfigClient;
 import com.yaconfig.client.YAEntry;
@@ -145,13 +146,19 @@ public class ServerTest
     	
     	client.scanPackage(ServerTest.class.getPackage().getName());
     	client.attach("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890");
-		TestConfig conf = new TestConfig(client);
+		TestConfig conf = (TestConfig)ConfigFactory.getConfig(TestConfig.class);
 		
-		Thread.sleep(5000);
-    	for(int i=0;i<1;i++){
+		Thread.sleep(3000);
+		
+		conf.useValue3FromFile();
+		Thread.sleep(3000);
+		conf.useValue3FromRemote();
+		Thread.sleep(3000);
+		conf.setValue3("fromMemory1111");
+    	for(int i=0;i<0;i++){
     		//Thread.sleep(100);
     		YAFuture<YAEntry> f = client.put("com.test.0",
-    				"878451".getBytes(), YAMessage.Type.PUT_NOPROMISE);
+    				"fromRemote".getBytes(), YAMessage.Type.PUT_NOPROMISE);
     		
     		f.addListener(new FutureListener<YAEntry>(){
 

@@ -15,6 +15,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -38,8 +39,6 @@ import org.reflections.util.ConfigurationBuilder;
 import org.reflections.util.FilterBuilder;
 
 import com.google.common.base.Predicate;
-import com.google.common.io.Files;
-import com.yaconfig.client.AbstractConfig;
 import com.yaconfig.client.Constants;
 import com.yaconfig.client.YAConfigClient;
 import com.yaconfig.client.YAEntry;
@@ -55,11 +54,12 @@ import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.future.YAFutureListener;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.storage.FileWatcher;
+import com.yaconfig.client.util.FileUtil;
 
 public class ValueInjector implements FieldChangeCallback {
 	
-	private List<SoftReference<AbstractConfig>> registry;
-	public ReferenceQueue<AbstractConfig> queue;
+	private List<SoftReference<Object>> registry;
+	public ReferenceQueue<Object> queue;
 	private YAConfigClient client;
 	private ValueInjector myself;
 	private FileWatcher fileWatcher;
@@ -70,8 +70,8 @@ public class ValueInjector implements FieldChangeCallback {
 	private Map<Field,Set<Method>> controlInjectMethods;
 	
 	public ValueInjector(YAConfigClient client){
-		this.registry = new LinkedList<SoftReference<AbstractConfig>>();
-		this.queue = new ReferenceQueue<AbstractConfig>();
+		this.registry = new LinkedList<SoftReference<Object>>();
+		this.queue = new ReferenceQueue<Object>();
 		this.client = client;
 		this.beforeInjectMethods = new HashMap<Field,Set<Method>>();
 		this.afterInjectMethods = new HashMap<Field,Set<Method>>();
@@ -115,7 +115,7 @@ public class ValueInjector implements FieldChangeCallback {
 			}
 		}
 		
-		//define initial values
+		//inject static values
 		fields = reflections.getFieldsAnnotatedWith(InitValueFrom.class);
 		for(Field field : fields){
 			initSetValue(field);
@@ -127,7 +127,7 @@ public class ValueInjector implements FieldChangeCallback {
     	if(df == null){
     		return;
     	}
-System.out.println("bugbugbugbug");
+
 		if(df.from().equals(DataFrom.FILE)){
 			FileValue fv = field.getAnnotation(FileValue.class);
 			if(fv != null){
@@ -242,7 +242,7 @@ System.out.println("bugbugbugbug");
 		}
 	}
 	
-	private void fetchAndInjectNewValue(final String key,final Field field,DataFrom from){
+	public void fetchAndInjectNewValue(final String key,final Field field,DataFrom from){
 		if(from.equals(DataFrom.REMOTE)){
 			YAFuture<YAEntry> f = client.get(key, YAMessage.Type.GET_LOCAL);
 			f.addListener(new YAFutureListener(key){
@@ -260,15 +260,13 @@ System.out.println("bugbugbugbug");
 						final FileValue fv = field.getAnnotation(FileValue.class);
 						if(fv != null){
 							Anchor anchor = field.getAnnotation(Anchor.class);
-							if(anchor != null && anchor.anchor().equals(AnchorType.FILE)){
-								return;
-							}
-							
-							try {
-								writeValueToFile(Paths.get(fv.path()).toAbsolutePath(),fv.key(),new String(future.get().getValue()));
-							} catch (IllegalArgumentException | InterruptedException
-									| ExecutionException e) {
-								e.printStackTrace();
+							if(anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
+								try {
+									FileUtil.writeValueToFile(fv.path(),fv.key(),new String(future.get().getValue()));
+								} catch (IllegalArgumentException | InterruptedException
+										| ExecutionException e) {
+									e.printStackTrace();
+								}
 							}
 						}
 						
@@ -277,167 +275,38 @@ System.out.println("bugbugbugbug");
 				
 			});
 		}else if(from.equals(DataFrom.FILE)){
-			String value = readValueFromFile(key);
+			String value = FileUtil.readValueFromFile(key);
 			injectValue(value,field);
 			RemoteValue rv = field.getAnnotation(RemoteValue.class);
 			if(rv != null){
 				Anchor anchor = field.getAnnotation(Anchor.class);
-				if(anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
-					return;
-				}
-				if(value != null){
-					client.put(rv.key(), value.getBytes(), YAMessage.Type.PUT_NOPROMISE);
-				}else{
-					//TODO:should remove the key on server?
-					client.put(rv.key(), "".getBytes(), YAMessage.Type.PUT_NOPROMISE);
-				}
-			}
-		}
-
-	}
-
-	private synchronized void writeValueToFile(Path path, String key,String value) {
-		File thefile = path.toFile();
-		OutputStreamWriter writer = null;
-		InputStreamReader reader = null;
-		BufferedReader bufferedReader = null;
-		try {
-			if(thefile.exists()){
-				reader = new InputStreamReader(new FileInputStream(thefile));
-				bufferedReader = new BufferedReader(reader);
-				File tmpfile = new File(path + ".yatmp" + System.nanoTime());
-				writer = new OutputStreamWriter(new FileOutputStream(tmpfile));
-				
-				String line = null;
-				while((line = bufferedReader.readLine()) != null){
-					if(line.contains("=")){
-						String name = line.substring(0,line.lastIndexOf('='));
-						if(name.equalsIgnoreCase(key)){
-							writer.write(key + "=" + value + "\r");
-						}else{
-							writer.write(line + "\r");
-						}
+				if(anchor != null && anchor.anchor().equals(AnchorType.FILE)){
+					if(value != null){
+						client.put(rv.key(), value.getBytes(), YAMessage.Type.PUT_NOPROMISE);
 					}else{
-						writer.write(line + "\r");
+						//TODO:should remove the key on server?
+						client.put(rv.key(), "".getBytes(), YAMessage.Type.PUT_NOPROMISE);
 					}
 				}
-				writer.flush();
-				reader.close();
-				bufferedReader.close();
-				writer.close();
-				
-				if(thefile.delete()){
-					Files.copy(new File(tmpfile.getAbsolutePath()), new File(thefile.getAbsolutePath()));
-					tmpfile.delete();
-				}
-			}else{
-				thefile.createNewFile();
-				writer = new OutputStreamWriter(new FileOutputStream(thefile));
-				writer.write(key + "=" + value);
-				writer.flush();
-			}
-		}catch (IOException e) {
-			e.printStackTrace();
-		}finally{
-			if(writer != null){
-				try {
-					writer.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-			if(reader != null){
-				try {
-					reader.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-			if(bufferedReader != null){
-				try {
-					bufferedReader.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+
 			}
 		}
 
 	}
-	
-	private synchronized String readValueFromFile(String key) {
-		String path = key.substring(0,key.lastIndexOf('@'));
-		String fieldName = key.substring(key.lastIndexOf('@') + 1);
-		File file = Paths.get(path).toAbsolutePath().toFile();
-		BufferedReader bufferedReader = null;
-		InputStreamReader reader = null;
-		if(file.isFile() && file.exists()){
-			try {
-				reader = new InputStreamReader(new FileInputStream(file));
-				bufferedReader = new BufferedReader(reader);
-				String line = bufferedReader.readLine();
-				if(line != null){
-					do{
-						String retValue = getValueFromLine(line,fieldName);
-						if(retValue != null){
-							return retValue;
-						}
-					}while((line = bufferedReader.readLine()) != null);
-				}else{
-					//may be BufferedReader bug, read next line.
-					while((line = bufferedReader.readLine()) != null){
-						String retValue = getValueFromLine(line,fieldName);
-						if(retValue != null){
-							return retValue;
-						}
-					}
-				}
-				
-			} catch (IOException e) {
-				e.printStackTrace();
-			}finally{
-				if(bufferedReader != null){
-					try {
-						bufferedReader.close();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-				if(reader != null){
-					try {
-						reader.close();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-			}
-		}
-		
-		return null;
-	}
 
-	private String getValueFromLine(String line,String fieldName) {
-		if(line.contains("=")){
-			String name = line.substring(0,line.lastIndexOf('='));
-			String value = line.substring(line.lastIndexOf('=') + 1);
-			if(name.equalsIgnoreCase(fieldName)){
-				return value == null ? "" : value;
-			}
-		}
-		return null;
-	}
-
-	public void register(AbstractConfig config) {
+	public void register(Object configProxy) {
 		synchronized(registry){
-			registry.add(new SoftReference<AbstractConfig>(config,this.queue));
+			registry.add(new SoftReference<Object>(configProxy,this.queue));
 		}
-
-		Field[] fs = config.getClass().getFields();
+		Class<?> c = configProxy.getClass().getSuperclass();
+		Field[] fs = c.getDeclaredFields();
 		for(Field f : fs){
 			initSetValue(f);
 		}
 	}
 	
-	private void injectValue(String value,Field field) {
+	public void injectValue(String value,Field field) {
+		field.setAccessible(true);
 		if(Modifier.isStatic(field.getModifiers())){
 			try {
 				inject(field.getClass(),field,value);
@@ -448,9 +317,8 @@ System.out.println("bugbugbugbug");
 			final Class<?> clazz = field.getDeclaringClass();
 			
 			synchronized(registry){
-				for(SoftReference<AbstractConfig> config : registry){
-					
-					if(clazz.equals(config.get().getClass())){
+				for(SoftReference<Object> config : registry){
+					if(clazz.equals(config.get().getClass().getSuperclass())){
 						try {
 							inject(config.get(),field,value);
 						} catch (IllegalArgumentException e) {

@@ -370,10 +370,14 @@ public class YAConfigClient extends MessageProcessor{
 		super.channelInactive(channel);
 	}
 	
-	public void registerConfig(AbstractConfig config){
+	public void registerConfig(Object config){
 		injector.register(config);
 	}
 
+	public ValueInjector getValueInjector(){
+		return injector;
+	}
+	
 }
 
 
