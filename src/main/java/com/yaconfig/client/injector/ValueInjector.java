@@ -17,8 +17,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.reflections.Reflections;
@@ -33,8 +33,7 @@ import org.reflections.util.FilterBuilder;
 
 import com.google.common.base.Predicate;
 import com.yaconfig.client.Constants;
-import com.yaconfig.client.YAConfigClient;
-import com.yaconfig.client.YAEntry;
+import com.yaconfig.client.YAConfigConnection;
 import com.yaconfig.client.annotation.AfterChange;
 import com.yaconfig.client.annotation.Anchor;
 import com.yaconfig.client.annotation.BeforeChange;
@@ -42,30 +41,37 @@ import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.annotation.InitValueFrom;
 import com.yaconfig.client.annotation.RemoteValue;
-import com.yaconfig.client.future.AbstractFuture;
-import com.yaconfig.client.future.YAFuture;
-import com.yaconfig.client.future.YAFutureListener;
+import com.yaconfig.client.fetcher.FetchCallback;
+import com.yaconfig.client.fetcher.FileFetcher;
+import com.yaconfig.client.fetcher.RemoteFetcher;
 import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.client.util.ConnStrKeyUtil;
 import com.yaconfig.client.util.FileUtil;
 import com.yaconfig.client.watchers.FileWatchers;
+import com.yaconfig.client.watchers.MySQLWatchers;
+import com.yaconfig.client.watchers.RedisWatchers;
 import com.yaconfig.client.watchers.RemoteWatchers;
-import com.yaconfig.client.watchers.Watchers;
+import com.yaconfig.client.watchers.ZookeeperWatchers;
 
-public class ValueInjector implements FieldChangeCallback {
+public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	
 	public static final int SOFT_GC_INTERVAL = 1000;
 	
 	private List<SoftReference<Object>> registry;
 	public ReferenceQueue<Object> queue;
 	private volatile static ValueInjector instance;
-	private Set<Watchers> watchersSet;
+	private RemoteWatchers remoteWatchers;
+	private FileWatchers fileWatchers;
+	private MySQLWatchers mySQLWatchers;
+	private RedisWatchers redisWatchers;
+	private ZookeeperWatchers zookeeperWatchers;
 	
 	private Set<Field> fields;
 	private Map<Field,Set<Method>> beforeInjectMethods;
 	private Map<Field,Set<Method>> afterInjectMethods;
 	private Map<Field,Set<Method>> controlInjectMethods;
 	
-	private YAConfigClient client = YAConfigClient.getInstance();
+	private static ScheduledExecutorService purgeTask;
 	
 	public static ValueInjector getInstance(){
 		if(instance == null){
@@ -76,7 +82,8 @@ public class ValueInjector implements FieldChangeCallback {
 			}
 		}
 		
-		Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(new Runnable(){
+		purgeTask = Executors.newSingleThreadScheduledExecutor();
+		purgeTask.scheduleAtFixedRate(new Runnable(){
 
 			@Override
 			public void run() {
@@ -94,7 +101,6 @@ public class ValueInjector implements FieldChangeCallback {
 		this.beforeInjectMethods = new HashMap<Field,Set<Method>>();
 		this.afterInjectMethods = new HashMap<Field,Set<Method>>();
 		this.controlInjectMethods = new HashMap<Field,Set<Method>>();
-		this.watchersSet = new HashSet<Watchers>();
 	}
 	
 	public synchronized void scan(String[] packageList) {
@@ -103,35 +109,17 @@ public class ValueInjector implements FieldChangeCallback {
 		//remote values
 		fields = reflections.getFieldsAnnotatedWith(RemoteValue.class);
 		if(fields.size() != 0){
-			RemoteWatchers remoteWatchers = new RemoteWatchers();
-			this.watchersSet.add(remoteWatchers);
-			client.setRemoteWatchers(remoteWatchers);
+			RemoteWatchers remoteWatchers = new RemoteWatchers(fields,this);
+			this.remoteWatchers = remoteWatchers;
 			registerFields(fields,reflections);
-			for(final Field field : fields){
-				RemoteValue annotation = field.getAnnotation(RemoteValue.class);
-				String key = annotation.key();
-				Anchor anchor = field.getAnnotation(Anchor.class);
-				if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
-					remoteWatchers.watch(key,new FieldChangeListener(field,this));
-				}
-			}
 		}
 		
 		//file values
 		fields = reflections.getFieldsAnnotatedWith(FileValue.class);
 		if(fields.size() != 0){
-			FileWatchers fileWatchers = new FileWatchers(this);
-			this.watchersSet.add(fileWatchers);
+			FileWatchers fileWatchers = new FileWatchers(fields,this);
+			this.fileWatchers = fileWatchers;
 			registerFields(fields,reflections);
-			for(Field field : fields){
-				String path_r = field.getAnnotation(FileValue.class).path();
-				String path = Paths.get(path_r).toAbsolutePath().toString();
-				String key = field.getAnnotation(FileValue.class).key();
-				Anchor anchor = field.getAnnotation(Anchor.class);
-				if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.FILE)){
-					fileWatchers.watch(path + Constants.FILE_KEY_SEPERATOR + key, new FieldChangeListener(field,this));
-				}
-			}
 		}
 		
 		//inject static values
@@ -153,13 +141,14 @@ public class ValueInjector implements FieldChangeCallback {
 				String path_r = field.getAnnotation(FileValue.class).path();
 				String path = Paths.get(path_r).toAbsolutePath().toString();
 				String key = field.getAnnotation(FileValue.class).key();
-				fetchAndInjectNewValue(path + Constants.FILE_KEY_SEPERATOR + key, field, DataFrom.FILE);
+				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(path, key), field, DataFrom.FILE);
 			}
 		}else if(df.from().equals(DataFrom.REMOTE)){
 			RemoteValue rv = field.getAnnotation(RemoteValue.class);
 			if(rv != null){
 				String key = rv.key();
-				fetchAndInjectNewValue(key, field, DataFrom.REMOTE);
+				String connStr = rv.connStr();
+				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.REMOTE);
 			}
 		}
 	}
@@ -261,56 +250,54 @@ public class ValueInjector implements FieldChangeCallback {
 		}
 	}
 	
-	public void fetchAndInjectNewValue(final String key,final Field field,DataFrom from){
+	public void fetchAndInjectNewValue(final String key,final Field field,final DataFrom from){
 		if(from.equals(DataFrom.REMOTE)){
-			YAFuture<YAEntry> f = client.get(key, YAMessage.Type.GET_LOCAL);
-			f.addListener(new YAFutureListener(key){
-	
-				@Override
-				public void operationCompleted(AbstractFuture<YAEntry> future) {
-					if(future.isSuccess()){
-						try {
-							instance.injectValue(new String(future.get().getValue()),field);
-						} catch (IllegalArgumentException | InterruptedException
-								| ExecutionException e) {
-							e.printStackTrace();
-						}
-						
-						final FileValue fv = field.getAnnotation(FileValue.class);
-						if(fv != null){
-							Anchor anchor = field.getAnnotation(Anchor.class);
-							if(anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
-								try {
-									FileUtil.writeValueToFile(fv.path(),fv.key(),new String(future.get().getValue()));
-								} catch (IllegalArgumentException | InterruptedException
-										| ExecutionException e) {
-									e.printStackTrace();
-								}
-							}
-						}
-						
-					}
-				}
-				
-			});
+			RemoteFetcher remoteFetcher = new RemoteFetcher(field);
+			remoteFetcher.fetch(key, this);
 		}else if(from.equals(DataFrom.FILE)){
-			String value = FileUtil.readValueFromFile(key);
-			injectValue(value,field);
-			RemoteValue rv = field.getAnnotation(RemoteValue.class);
-			if(rv != null){
-				Anchor anchor = field.getAnnotation(Anchor.class);
-				if(anchor != null && anchor.anchor().equals(AnchorType.FILE)){
-					if(value != null){
-						client.put(rv.key(), value.getBytes(), YAMessage.Type.PUT_NOPROMISE);
-					}else{
-						//TODO:should remove the key on server?
-						client.put(rv.key(), "".getBytes(), YAMessage.Type.PUT_NOPROMISE);
-					}
-				}
+			FileFetcher fileFetcher = new FileFetcher(field);
+			fileFetcher.fetch(key, this);
+		}
+	}
 
+	protected void syncValue(String data, Field field, DataFrom from) {
+		Anchor anchor = field.getAnnotation(Anchor.class);
+		if(anchor != null){
+			AnchorType anchorType = anchor.anchor();
+			final FileValue fv = field.getAnnotation(FileValue.class);
+			if(fv != null && anchorType.equals(AnchorType.FILE) && from.equals(DataFrom.FILE)){
+				try {
+					syncValue0(data,field,from);
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			final RemoteValue rv = field.getAnnotation(RemoteValue.class);
+			if(rv != null && anchorType.equals(AnchorType.REMOTE) && from.equals(DataFrom.REMOTE)){
+				try {
+					syncValue0(data,field,from);
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				}
 			}
 		}
+	}
 
+	private void syncValue0(String data, Field field, DataFrom from) {
+		final FileValue fv = field.getAnnotation(FileValue.class);
+		final RemoteValue rv = field.getAnnotation(RemoteValue.class);
+
+		if(fv != null && from != DataFrom.FILE){
+			FileUtil.writeValueToFile(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), data);
+		}
+		
+		if(rv != null && from != DataFrom.REMOTE){
+			YAConfigConnection connection = new YAConfigConnection();
+			connection.attach(rv.connStr());
+			connection.put(rv.key(), data.getBytes(), YAMessage.Type.PUT_NOPROMISE).awaitUninterruptibly();
+			connection.detach();
+		}
 	}
 
 	public void register(Object configProxy) {
@@ -407,6 +394,17 @@ public class ValueInjector implements FieldChangeCallback {
 	        }  
 	        registry.remove(softRef);  
 		}  
+	}
+
+	@Override
+	public void dataFetched(String data, Field field, DataFrom from) {
+		try {
+			injectValue(data,field);
+		} catch (IllegalArgumentException e) {
+			e.printStackTrace();
+		}
+		
+		syncValue(data,field,from);
 	}
 }
 

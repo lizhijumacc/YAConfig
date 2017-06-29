@@ -4,9 +4,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
 public class YAConfigClientHandler extends ChannelInboundHandlerAdapter {
-	private YAConfigClient client;
+	private YAConfigConnection client;
 	
-	public YAConfigClientHandler(YAConfigClient client){
+	public YAConfigClientHandler(YAConfigConnection client){
 		this.client = client;
 	}
 	

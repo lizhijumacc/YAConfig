@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.yaconfig.client.ConfigFactory;
 import com.yaconfig.client.YAConfig;
-import com.yaconfig.client.YAConfigClient;
+import com.yaconfig.client.YAConfigConnection;
 import com.yaconfig.client.YAEntry;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.future.AbstractFuture;
@@ -50,8 +50,6 @@ public class ServerTest
 	public String remoteValue;
 	
 	public ServerTest myself;
-	
-	YAConfigClient client = YAConfigClient.getInstance();
 	
     /**
      * Create the test case
@@ -147,7 +145,6 @@ public class ServerTest
     	YAConfig config = new YAConfig();
     	
     	config.scanPackage(ServerTest.class.getPackage().getName());
-    	client.attach("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890");
 		TestConfig conf = (TestConfig)ConfigFactory.getConfig(TestConfig.class);
 		
 		Thread.sleep(3000);
@@ -156,11 +153,10 @@ public class ServerTest
 		//Thread.sleep(3000);
 		conf.useValue3FromRemote();
 		Thread.sleep(3000);
-		conf.setValue3("fromMemory1111");
+		//conf.setValue3("fromMemory1111");
     	for(int i=0;i<0;i++){
     		//Thread.sleep(100);
-    		YAFuture<YAEntry> f = client.put("com.test.0",
-    				"fromRemote".getBytes(), YAMessage.Type.PUT_NOPROMISE);
+    		/*YAFuture<YAEntry> f = client.put("com.test.0","fromRemote".getBytes(), YAMessage.Type.PUT_NOPROMISE);
     		
     		f.addListener(new FutureListener<YAEntry>(){
 
@@ -171,7 +167,7 @@ public class ServerTest
     			
     		});
     		
-    		/*if(i == 3){
+    		if(i == 3){
     			client.attach("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890");
     			yaclient.unwatch("com.test.*");
     			System.out.println("attach1");

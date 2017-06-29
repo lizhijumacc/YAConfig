@@ -12,6 +12,7 @@ import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.ValueInjector;
 import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.client.util.ConnStrKeyUtil;
 import com.yaconfig.client.util.FileUtil;
 
 import net.sf.cglib.proxy.MethodInterceptor;
@@ -39,19 +40,19 @@ public class YAMethodInterceptor implements MethodInterceptor {
 				DataFrom from = gm.from();
 				if(from != null){
 					if(from.equals(DataFrom.FILE) && fv != null){
-						injectDataFrom(fv.path() + "@" + fv.key(), f ,from);
+						injectDataFrom(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), f ,from);
 					}
 					if(from.equals(DataFrom.REMOTE) && rv != null){
-						injectDataFrom(rv.key(), f ,from);
+						injectDataFrom(ConnStrKeyUtil.makeLocation(rv.connStr(),rv.key()), f ,from);
 					}
 				}else{
 					Anchor anchor = f.getAnnotation(Anchor.class);
 					if(anchor != null && anchor.anchor().equals(AnchorType.FILE)
 							&& fv != null){
-						injectDataFrom(fv.path() + "@" + fv.key(),f,DataFrom.FILE);
+						injectDataFrom(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()),f,DataFrom.FILE);
 					}else if(anchor != null && anchor.anchor().equals(AnchorType.REMOTE)
 							&& rv != null){
-						injectDataFrom(rv.key(),f,DataFrom.REMOTE);
+						injectDataFrom(ConnStrKeyUtil.makeLocation(rv.connStr(),rv.key()),f,DataFrom.REMOTE);
 					}
 				}
 			}
@@ -73,12 +74,15 @@ public class YAMethodInterceptor implements MethodInterceptor {
 				if(anchor != null && anchor.anchor().equals(AnchorType.MEMORY)){
 					FileValue fv = f.getAnnotation(FileValue.class);
 					if(fv != null){
-						FileUtil.writeValueToFile(fv.path(), fv.key(), newValue);
+						FileUtil.writeValueToFile(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), newValue);
 					}
 					
 					RemoteValue rv = f.getAnnotation(RemoteValue.class);
 					if(rv != null){
-						YAConfigClient.getInstance().put(rv.key(), newValue.getBytes(), YAMessage.Type.PUT_NOPROMISE);
+						YAConfigConnection connction = new YAConfigConnection();
+						connction.attach(rv.connStr());
+						connction.put(rv.key(), newValue.getBytes(), YAMessage.Type.PUT_NOPROMISE).awaitUninterruptibly();
+						connction.detach();
 					}
 					
 					ValueInjector.getInstance().injectValue(newValue,f);

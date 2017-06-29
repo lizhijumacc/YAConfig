@@ -20,16 +20,34 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.yaconfig.client.Constants;
+import com.yaconfig.client.annotation.Anchor;
+import com.yaconfig.client.annotation.FileValue;
+import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
+import com.yaconfig.client.injector.FieldChangeListener;
+import com.yaconfig.client.util.ConnStrKeyUtil;
 
 public class FileWatchers extends AbstractWatchers {
 	HashMap<Path,ExecutorService> pathSet;
 	HashMap<Path,Set<Watcher>> pathMapWatchers;
 	
-	public FileWatchers(FieldChangeCallback callback){
+	public FileWatchers(Set<Field> fields, FieldChangeCallback callback){
 		pathSet = new HashMap<Path,ExecutorService>();
 		pathMapWatchers = new HashMap<Path,Set<Watcher>>();
+		
+		for(Field field : fields){
+			FileValue fv = field.getAnnotation(FileValue.class);
+			if(fv != null){
+				String path_r = fv.path();
+				String path = Paths.get(path_r).toAbsolutePath().toString();
+				String key = field.getAnnotation(FileValue.class).key();
+				Anchor anchor = field.getAnnotation(Anchor.class);
+				if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.FILE)){
+					watch(ConnStrKeyUtil.makeLocation(path, key), new FieldChangeListener(field,callback));
+				}
+			}
+		}
 	}
 	
 	protected void notifyFileWatchers(String changedFile, Kind<?> kind) {
@@ -69,7 +87,7 @@ public class FileWatchers extends AbstractWatchers {
 			return;
 		}
 		
-		String file = key.substring(0,key.indexOf(Constants.FILE_KEY_SEPERATOR));
+		String file = ConnStrKeyUtil.getConnStrFromStr(key);
 		final Path path = Paths.get(file.substring(0,file.lastIndexOf(File.separator)));
 		
 		synchronized(pathSet){
@@ -111,7 +129,7 @@ public class FileWatchers extends AbstractWatchers {
 	public void unwatch(String key,WatcherListener... listeners){
 		boolean needUnregister = unwatchLocal(key,listeners);
 		if(needUnregister){
-			String file = key.substring(0,key.indexOf(Constants.FILE_KEY_SEPERATOR));
+			String file = ConnStrKeyUtil.getConnStrFromStr(key);
 			final Path path = Paths.get(file.substring(0,file.lastIndexOf(File.separator)));
 			pathMapWatchers.get(path).remove(getWatcher(key));
 			if(pathMapWatchers.get(path).size() == 0){

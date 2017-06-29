@@ -114,7 +114,7 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 			nack(yamsgw,"Service is not available now.".getBytes());
 			return;
 		}
-
+		
 		ChannelHandlerContext ctx = yamsgw.ctx;
 		YAMessage yamsg = yamsgw.msg;
 
@@ -159,6 +159,9 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 	}
 	
 	private void ack(YAMessageWrapper yamsgw, byte[] bytes) {
+		if(bytes == null){
+			bytes = "".getBytes();
+		}
 		YAMessage sendMsg = new YAMessage(YAMessage.Type.ACK,yamsgw.msg.getKey(),bytes);
 		sendMsg.setId(yamsgw.msg.getId());
 		produce(sendMsg,yamsgw.ctx.channel().id());

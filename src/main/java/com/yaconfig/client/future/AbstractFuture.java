@@ -258,7 +258,8 @@ public class AbstractFuture<V> implements Future<V> {
 			notifyListeners();
 			return this;
 		}
-		throw new IllegalStateException("complete already: " + this);
+		return this;
+		//throw new IllegalStateException("complete already: " + this);
 	}
 
 	private boolean setFailure0(Throwable cause) {

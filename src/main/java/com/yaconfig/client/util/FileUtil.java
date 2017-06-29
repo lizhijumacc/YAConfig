@@ -13,7 +13,9 @@ import com.google.common.io.Files;
 
 public class FileUtil {
 	
-	public static synchronized void writeValueToFile(String path, String key,String value) {
+	public static synchronized void writeValueToFile(String location,String value) {
+		String path = ConnStrKeyUtil.getConnStrFromStr(location);
+		String key = ConnStrKeyUtil.getKeyNameFromStr(location);
 		File thefile = Paths.get(path).toAbsolutePath().toFile();
 		OutputStreamWriter writer = null;
 
@@ -70,8 +72,8 @@ public class FileUtil {
 	}
 	
 	public static synchronized String readValueFromFile(String key) {
-		String path = key.substring(0,key.lastIndexOf('@'));
-		String fieldName = key.substring(key.lastIndexOf('@') + 1);
+		String path = ConnStrKeyUtil.getConnStrFromStr(key);
+		String fieldName = ConnStrKeyUtil.getKeyNameFromStr(key);
 		File file = Paths.get(path).toAbsolutePath().toFile();
 
 		if(file.isFile() && file.exists()){
