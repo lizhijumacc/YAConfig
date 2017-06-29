@@ -6,15 +6,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.yaconfig.client.ConfigFactory;
-import com.yaconfig.client.Watcher;
+import com.yaconfig.client.YAConfig;
 import com.yaconfig.client.YAConfigClient;
 import com.yaconfig.client.YAEntry;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.future.AbstractFuture;
 import com.yaconfig.client.future.FutureListener;
 import com.yaconfig.client.future.YAFuture;
-import com.yaconfig.client.WatcherListener;
 import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.client.watchers.Watcher;
+import com.yaconfig.client.watchers.WatcherListener;
 
 import io.netty.channel.ChannelFuture;
 import junit.framework.Test;
@@ -108,7 +109,7 @@ public class ServerTest
     	
     	//service.execute(everyConnectTask);
     	
-		client.watch("com.test.0", new WatcherListener(){
+		/*client.watch("com.test.0", new WatcherListener(){
 
 			@Override
 			public void onDelete(Watcher w,String key) {
@@ -141,17 +142,18 @@ public class ServerTest
 				});
 			}
 			
-		});
+		});*/
 
+    	YAConfig config = new YAConfig();
     	
-    	client.scanPackage(ServerTest.class.getPackage().getName());
+    	config.scanPackage(ServerTest.class.getPackage().getName());
     	client.attach("127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890");
 		TestConfig conf = (TestConfig)ConfigFactory.getConfig(TestConfig.class);
 		
 		Thread.sleep(3000);
 		
-		conf.useValue3FromFile();
-		Thread.sleep(3000);
+		//conf.useValue3FromFile();
+		//Thread.sleep(3000);
 		conf.useValue3FromRemote();
 		Thread.sleep(3000);
 		conf.setValue3("fromMemory1111");

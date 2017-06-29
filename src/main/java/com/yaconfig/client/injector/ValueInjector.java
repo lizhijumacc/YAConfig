@@ -1,12 +1,5 @@
 package com.yaconfig.client.injector;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.lang.annotation.Annotation;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
@@ -15,8 +8,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
-import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.reflections.Reflections;
 import org.reflections.scanners.FieldAnnotationsScanner;
@@ -53,64 +46,90 @@ import com.yaconfig.client.future.AbstractFuture;
 import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.future.YAFutureListener;
 import com.yaconfig.client.message.YAMessage;
-import com.yaconfig.client.storage.FileWatcher;
 import com.yaconfig.client.util.FileUtil;
+import com.yaconfig.client.watchers.FileWatchers;
+import com.yaconfig.client.watchers.RemoteWatchers;
+import com.yaconfig.client.watchers.Watchers;
 
 public class ValueInjector implements FieldChangeCallback {
 	
+	public static final int SOFT_GC_INTERVAL = 1000;
+	
 	private List<SoftReference<Object>> registry;
 	public ReferenceQueue<Object> queue;
-	private YAConfigClient client;
-	private ValueInjector myself;
-	private FileWatcher fileWatcher;
+	private volatile static ValueInjector instance;
+	private Set<Watchers> watchersSet;
 	
 	private Set<Field> fields;
 	private Map<Field,Set<Method>> beforeInjectMethods;
 	private Map<Field,Set<Method>> afterInjectMethods;
 	private Map<Field,Set<Method>> controlInjectMethods;
 	
-	public ValueInjector(YAConfigClient client){
+	private YAConfigClient client = YAConfigClient.getInstance();
+	
+	public static ValueInjector getInstance(){
+		if(instance == null){
+			synchronized(ValueInjector.class){
+				if(instance == null){
+					instance = new ValueInjector();
+				}
+			}
+		}
+		
+		Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(new Runnable(){
+
+			@Override
+			public void run() {
+				instance.purgeSoftQueue();
+			}
+			
+		},200, SOFT_GC_INTERVAL, TimeUnit.MILLISECONDS);
+		
+		return instance;
+	}
+	
+	private ValueInjector(){
 		this.registry = new LinkedList<SoftReference<Object>>();
 		this.queue = new ReferenceQueue<Object>();
-		this.client = client;
 		this.beforeInjectMethods = new HashMap<Field,Set<Method>>();
 		this.afterInjectMethods = new HashMap<Field,Set<Method>>();
 		this.controlInjectMethods = new HashMap<Field,Set<Method>>();
-		myself = this;
+		this.watchersSet = new HashSet<Watchers>();
 	}
 	
 	public synchronized void scan(String[] packageList) {
 		Reflections reflections = getReflection(packageList);
 		
-		fields = reflections.getFieldsAnnotatedWith(RemoteValue.class);
-		registerFields(fields,reflections);
-		
 		//remote values
-		for(final Field field : fields){
-			RemoteValue annotation = field.getAnnotation(RemoteValue.class);
-			String key = annotation.key();
-			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
-				client.watchLocal(key,new RemoteFieldChangeListener(field,this));
+		fields = reflections.getFieldsAnnotatedWith(RemoteValue.class);
+		if(fields.size() != 0){
+			RemoteWatchers remoteWatchers = new RemoteWatchers();
+			this.watchersSet.add(remoteWatchers);
+			client.setRemoteWatchers(remoteWatchers);
+			registerFields(fields,reflections);
+			for(final Field field : fields){
+				RemoteValue annotation = field.getAnnotation(RemoteValue.class);
+				String key = annotation.key();
+				Anchor anchor = field.getAnnotation(Anchor.class);
+				if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
+					remoteWatchers.watch(key,new FieldChangeListener(field,this));
+				}
 			}
 		}
 		
 		//file values
 		fields = reflections.getFieldsAnnotatedWith(FileValue.class);
 		if(fields.size() != 0){
-			fileWatcher = new FileWatcher(this);
+			FileWatchers fileWatchers = new FileWatchers(this);
+			this.watchersSet.add(fileWatchers);
 			registerFields(fields,reflections);
 			for(Field field : fields){
 				String path_r = field.getAnnotation(FileValue.class).path();
 				String path = Paths.get(path_r).toAbsolutePath().toString();
 				String key = field.getAnnotation(FileValue.class).key();
-				try {
-					Anchor anchor = field.getAnnotation(Anchor.class);
-					if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.FILE)){
-						fileWatcher.registerWatcher(path, key, field);
-					}
-				} catch (IOException e) {
-					e.printStackTrace();
+				Anchor anchor = field.getAnnotation(Anchor.class);
+				if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.FILE)){
+					fileWatchers.watch(path + Constants.FILE_KEY_SEPERATOR + key, new FieldChangeListener(field,this));
 				}
 			}
 		}
@@ -134,7 +153,7 @@ public class ValueInjector implements FieldChangeCallback {
 				String path_r = field.getAnnotation(FileValue.class).path();
 				String path = Paths.get(path_r).toAbsolutePath().toString();
 				String key = field.getAnnotation(FileValue.class).key();
-				fetchAndInjectNewValue(path + "@" + key, field, DataFrom.FILE);
+				fetchAndInjectNewValue(path + Constants.FILE_KEY_SEPERATOR + key, field, DataFrom.FILE);
 			}
 		}else if(df.from().equals(DataFrom.REMOTE)){
 			RemoteValue rv = field.getAnnotation(RemoteValue.class);
@@ -236,7 +255,7 @@ public class ValueInjector implements FieldChangeCallback {
 	@Override
 	public void onDelete(String key, Field field, DataFrom from) {
 		try {
-			myself.injectValue(null,field);
+			injectValue(null,field);
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
@@ -251,7 +270,7 @@ public class ValueInjector implements FieldChangeCallback {
 				public void operationCompleted(AbstractFuture<YAEntry> future) {
 					if(future.isSuccess()){
 						try {
-							myself.injectValue(new String(future.get().getValue()),field);
+							instance.injectValue(new String(future.get().getValue()),field);
 						} catch (IllegalArgumentException | InterruptedException
 								| ExecutionException e) {
 							e.printStackTrace();

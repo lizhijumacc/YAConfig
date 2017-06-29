@@ -6,7 +6,10 @@ import com.yaconfig.client.annotation.BeforeChange;
 import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.annotation.Use;
+import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.annotation.InitValueFrom;
+import com.yaconfig.client.annotation.MySQLValue;
+import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.annotation.SetValue;
 import com.yaconfig.client.injector.AnchorType;
@@ -14,7 +17,8 @@ import com.yaconfig.client.injector.DataFrom;
 
 public class TestConfig{
 
-	@RemoteValue(key = "com.test.6")
+	@RemoteValue(key = "com.test.0")
+	@Anchor(anchor = AnchorType.REMOTE)
 	private String value1;
 	
 	@RemoteValue(key = "com.test.6")
@@ -22,8 +26,11 @@ public class TestConfig{
 	
 	@RemoteValue(key = "com.test.0")
 	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
-	@Anchor(anchor = AnchorType.MEMORY)
-	@InitValueFrom(from = DataFrom.FILE)
+	@MySQLValue(connStr = "mysqlconnctstr", tableName = "TestConfigTable", filedName = "testConfig" , keyName = "connectStr")
+	@RedisValue(connStr = "redisconnctstr", key = "testConfig")
+	@ZookeeperValue(connStr = "redisconnctstr", key = "/testYA/testConfig")
+	@Anchor(anchor = AnchorType.FILE)
+	@InitValueFrom(from = DataFrom.REMOTE)
 	private String value3;
 	
 	public TestConfig() {
@@ -32,7 +39,7 @@ public class TestConfig{
 	
 	@BeforeChange(field = "value1")
 	public void before1(){
-		System.out.println("(1)old value1 is:" + value1);
+		//System.out.println("(1)old value1 is:" + value1);
 	}
 
 	@AfterChange(field = "value1")
@@ -42,22 +49,22 @@ public class TestConfig{
 	
 	@BeforeChange(field = "value1")
 	public void before2(){
-		System.out.println("(2)old value1 is:" + value1);
+		//System.out.println("(2)old value1 is:" + value1);
 	}
 
 	@AfterChange(field = "value1")
 	public void after2(){
-		System.out.println("(2)new value1 is:" + value1);
+		//System.out.println("(2)new value1 is:" + value1);
 	}
 	
 	@BeforeChange(field = "value2")
 	public void before3(){
-		System.out.println("(3)old value2 is:" + value2);
+		//System.out.println("(3)old value2 is:" + value2);
 	}
 
 	@AfterChange(field = "value2")
 	public void after3(){
-		System.out.println("(3)new value2 is:" + value2);
+		System.out.println("com.test.0 on SERVER is:" + value2);
 	}
 	
 	@ControlChange(field = "value2")

@@ -1,5 +1,7 @@
 package com.yaconfig.client;
 
+import com.yaconfig.client.injector.ValueInjector;
+
 import net.sf.cglib.proxy.Enhancer;
 
 public class ConfigFactory {
@@ -8,7 +10,7 @@ public class ConfigFactory {
 		enhancer.setSuperclass(configClass);
 		enhancer.setCallback(new YAMethodInterceptor());
 		Object proxy = enhancer.create();
-		YAConfigClient.getInstance().registerConfig(proxy);
+		ValueInjector.getInstance().register(proxy);
 		return proxy;
 	}
 }

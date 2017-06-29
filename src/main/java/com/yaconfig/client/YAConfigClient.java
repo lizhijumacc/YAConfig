@@ -15,11 +15,15 @@ import com.yaconfig.client.exceptions.YAFutureTimeoutException;
 import com.yaconfig.client.exceptions.YAOperationErrorException;
 import com.yaconfig.client.exceptions.YAServerDeadException;
 import com.yaconfig.client.future.YAFuture;
+import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.ValueInjector;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.message.YAMessageDecoder;
 import com.yaconfig.client.message.YAMessageEncoder;
 import com.yaconfig.client.message.YAMessageWrapper;
+import com.yaconfig.client.watchers.EventType;
+import com.yaconfig.client.watchers.RemoteWatchers;
+import com.yaconfig.client.watchers.WatcherListener;
 import com.yaconfig.common.MessageProcessor;
 
 import io.netty.bootstrap.Bootstrap;
@@ -42,8 +46,6 @@ public class YAConfigClient extends MessageProcessor{
 	
 	private List<Node> nodes;
 	
-	private HashMap<String,Watcher> watchers;
-	
 	private YAConfigClient myself;
 	
 	private ScheduledExecutorService scheduleTask;
@@ -54,19 +56,13 @@ public class YAConfigClient extends MessageProcessor{
 	
 	public static final int MAX_FUTURE_WAIT = 10000;
 	
-	public static final int SOFT_GC_INTERVAL = 1000;
-	
-	private static String SEPERATOR_TOKEN = ",";
+	private volatile static YAConfigClient instance;
 	
 	public Object notifyConnected = new Object();
 	
-	private ValueInjector injector;
-	
-	private static YAConfigClient instance;
+	private RemoteWatchers watchers;
 	
 	private YAConfigClient(){
-		this.watchers = new HashMap<String,Watcher>();
-		this.injector = new ValueInjector(this);
 		this.myself = this;
 	}
 	
@@ -80,10 +76,6 @@ public class YAConfigClient extends MessageProcessor{
 		}
 		
 		return instance;
-	}
-	
-	public void scanPackage(String scanPackage){
-		this.injector.scan(scanPackage.split(YAConfigClient.SEPERATOR_TOKEN));
 	}
 	
 	public YAConfigClient attach(String connStr){
@@ -140,14 +132,7 @@ public class YAConfigClient extends MessageProcessor{
 			
 		},100, MAX_FUTURE_WAIT, TimeUnit.MILLISECONDS);
 		
-		scheduleTask.scheduleAtFixedRate(new Runnable(){
 
-			@Override
-			public void run() {
-				injector.purgeSoftQueue();
-			}
-			
-		},200, SOFT_GC_INTERVAL, TimeUnit.MILLISECONDS);
 	}
 	
 	protected void purgeFutures() {
@@ -193,12 +178,12 @@ public class YAConfigClient extends MessageProcessor{
 	public void processMessageImpl(Object msg) {
 		YAMessageWrapper wrapper = (YAMessageWrapper)msg;
 		YAMessage yamsg = wrapper.msg;
-		if(yamsg.getType() == YAMessage.Type.ADD){
-			notifyWatchers(yamsg.getKey(),YAMessage.Type.ADD);
-		}else if(yamsg.getType() == YAMessage.Type.DELETE){
-			notifyWatchers(yamsg.getKey(),YAMessage.Type.DELETE);
-		}else if(yamsg.getType() == YAMessage.Type.UPDATE){
-			notifyWatchers(yamsg.getKey(),YAMessage.Type.UPDATE);
+		if(yamsg.getType() == YAMessage.Type.ADD && watchers != null){
+			watchers.notifyWatchers(yamsg.getKey(),EventType.ADD,DataFrom.REMOTE);
+		}else if(yamsg.getType() == YAMessage.Type.DELETE && watchers != null){
+			watchers.notifyWatchers(yamsg.getKey(),EventType.DELETE,DataFrom.REMOTE);
+		}else if(yamsg.getType() == YAMessage.Type.UPDATE && watchers != null){
+			watchers.notifyWatchers(yamsg.getKey(),EventType.UPDATE,DataFrom.REMOTE);
 		}else if(yamsg.getType() == YAMessage.Type.ACK){
 			YAFuture<YAEntry> f = futures.get(yamsg.getId());
 			if(f != null){
@@ -221,26 +206,8 @@ public class YAConfigClient extends MessageProcessor{
 	public YAFuture<YAEntry> get(String key,int type){
 		return writeCommand(key,"".getBytes(),type);
 	}
-
-	public YAFuture<YAEntry> watch(String key,WatcherListener... listeners){
-		boolean res = watchLocal(key,listeners);
-		if(res){
-			return writeCommand(key,"".getBytes(),YAMessage.Type.WATCH);
-		}else{
-			YAFuture<YAEntry> ref = new YAFuture<YAEntry>();
-			ref.setSuccess(key);
-			return ref;
-		} 
-	}
 	
-	public YAFuture<YAEntry> unwatch(final String key){
-		synchronized(myself.watchers){
-			watchers.remove(key);
-		}
-		return writeCommand(key,"".getBytes(),YAMessage.Type.UNWATCH);
-	}
-	
-	private YAFuture<YAEntry> writeCommand(String key, byte[] bytes, int type) {
+	public YAFuture<YAEntry> writeCommand(String key, byte[] bytes, int type) {
 		if(futures == null){
 			YAFuture<YAEntry> ref = new YAFuture<YAEntry>();
 			ref.setFailure(new YAException("YAConfig in running in Local mode."));
@@ -265,47 +232,15 @@ public class YAConfigClient extends MessageProcessor{
 		return f;
 	}
 	
-	public boolean watchLocal(String key,WatcherListener... listeners){
-		if(watchers.containsKey(key)){
-			watchers.get(key).addListeners(listeners);
-			return false;
-		}else{
-			Watcher watcher = new Watcher(key,channel);
-			watcher.addListeners(listeners);
-			synchronized(this.watchers){
-				watchers.put(key, watcher);
-			}
-		}
-		
-		return true;
-	}
-	
 	public void setChannel(Channel channel){
 		this.channel = channel;
-	
 		if(this.channel != null){
-			registerWatchers();
-		}
-	}
-	
-	private void registerWatchers() {
-		for(Watcher w : watchers.values()){
-			produce(new YAMessage(YAMessage.Type.WATCH,w.getKey(),"".getBytes()),channel.id());
+			watchers.registerAllWatchers();
 		}
 	}
 
 	public Channel getChannel(){
 		return this.channel;
-	}
-	
-	public void notifyWatchers(String key,int event){
-		synchronized(this.watchers){
-			for(Watcher w: watchers.values()){
-				if(key.matches(w.getKey())){
-					w.notifyListeners(event,key);
-				}
-			}
-		}
 	}
 	
 	private void connectServer(){
@@ -369,15 +304,10 @@ public class YAConfigClient extends MessageProcessor{
 		setChannel(null);
 		super.channelInactive(channel);
 	}
-	
-	public void registerConfig(Object config){
-		injector.register(config);
-	}
 
-	public ValueInjector getValueInjector(){
-		return injector;
+	public void setRemoteWatchers(RemoteWatchers watchers){
+		this.watchers = watchers;
 	}
-	
 }
 
 

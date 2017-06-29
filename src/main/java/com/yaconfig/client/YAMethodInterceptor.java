@@ -10,6 +10,7 @@ import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.annotation.SetValue;
 import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.DataFrom;
+import com.yaconfig.client.injector.ValueInjector;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.util.FileUtil;
 
@@ -58,7 +59,7 @@ public class YAMethodInterceptor implements MethodInterceptor {
 	}
 
 	private void injectDataFrom(String key,Field field,DataFrom from) {
-		YAConfigClient.getInstance().getValueInjector().fetchAndInjectNewValue(key, field, from);
+		ValueInjector.getInstance().fetchAndInjectNewValue(key, field, from);
 	}
 
 	private void processSetValue(Method method, Object object) throws Throwable {
@@ -80,7 +81,7 @@ public class YAMethodInterceptor implements MethodInterceptor {
 						YAConfigClient.getInstance().put(rv.key(), newValue.getBytes(), YAMessage.Type.PUT_NOPROMISE);
 					}
 					
-					YAConfigClient.getInstance().getValueInjector().injectValue(newValue,f);
+					ValueInjector.getInstance().injectValue(newValue,f);
 				}
 			}
 		}

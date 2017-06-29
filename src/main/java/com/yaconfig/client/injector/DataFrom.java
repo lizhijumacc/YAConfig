@@ -2,5 +2,8 @@ package com.yaconfig.client.injector;
 
 public enum DataFrom {
 	REMOTE,
-	FILE
+	FILE,
+	MYSQL,
+	REDIS,
+	ZOOKEEPER
 }
