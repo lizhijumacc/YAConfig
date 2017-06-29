@@ -19,6 +19,7 @@ import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.message.YAMessageDecoder;
 import com.yaconfig.client.message.YAMessageEncoder;
 import com.yaconfig.client.message.YAMessageWrapper;
+import com.yaconfig.client.util.ConnStrKeyUtil;
 import com.yaconfig.client.watchers.EventType;
 import com.yaconfig.client.watchers.RemoteWatchers;
 import com.yaconfig.common.MessageProcessor;
@@ -162,12 +163,13 @@ public class YAConfigConnection extends MessageProcessor{
 		YAMessageWrapper wrapper = (YAMessageWrapper)msg;
 		YAMessage yamsg = wrapper.msg;
 		
+		String watchKey = ConnStrKeyUtil.makeLocation(this.connnectStr, yamsg.getKey());
 		if(yamsg.getType() == YAMessage.Type.ADD && watchers != null){
-			watchers.notifyWatchers(yamsg.getKey(),EventType.ADD,DataFrom.REMOTE);
+			watchers.notifyWatchers(watchKey,EventType.ADD,DataFrom.REMOTE);
 		}else if(yamsg.getType() == YAMessage.Type.DELETE && watchers != null){
-			watchers.notifyWatchers(yamsg.getKey(),EventType.DELETE,DataFrom.REMOTE);
+			watchers.notifyWatchers(watchKey,EventType.DELETE,DataFrom.REMOTE);
 		}else if(yamsg.getType() == YAMessage.Type.UPDATE && watchers != null){
-			watchers.notifyWatchers(yamsg.getKey(),EventType.UPDATE,DataFrom.REMOTE);
+			watchers.notifyWatchers(watchKey,EventType.UPDATE,DataFrom.REMOTE);
 		}else if(yamsg.getType() == YAMessage.Type.ACK){
 			
 			YAFuture<YAEntry> f = futures.get(yamsg.getId());

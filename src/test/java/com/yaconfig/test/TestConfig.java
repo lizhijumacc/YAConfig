@@ -29,7 +29,7 @@ public class TestConfig{
 	@MySQLValue(connStr = "mysqlconnctstr", tableName = "TestConfigTable", filedName = "testConfig" , keyName = "connectStr")
 	@RedisValue(connStr = "redisconnctstr", key = "testConfig")
 	@ZookeeperValue(connStr = "redisconnctstr", key = "/testYA/testConfig")
-	@Anchor(anchor = AnchorType.REMOTE)
+	@Anchor(anchor = AnchorType.FILE)
 	@InitValueFrom(from = DataFrom.FILE)
 	private String value3;
 	
