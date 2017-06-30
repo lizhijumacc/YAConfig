@@ -17,18 +17,19 @@ import com.yaconfig.client.injector.DataFrom;
 
 public class TestConfig{
 
-	@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
-	@Anchor(anchor = AnchorType.REMOTE)
+	//@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
+	//@Anchor(anchor = AnchorType.REMOTE)
+	@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1")
+	@Anchor(anchor = AnchorType.ZOOKEEPER)
 	private String value1;
 	
-	//@RemoteValue(key = "com.test.6" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
 	private String value2;
 	
 	@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
 	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
 	@MySQLValue(connStr = "mysqlconnctstr", tableName = "TestConfigTable", filedName = "testConfig" , keyName = "connectStr")
 	@RedisValue(connStr = "redisconnctstr", key = "testConfig")
-	@ZookeeperValue(connStr = "redisconnctstr", key = "/testYA/testConfig")
+	@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1")
 	@Anchor(anchor = AnchorType.FILE)
 	@InitValueFrom(from = DataFrom.FILE)
 	private String value3;

@@ -23,19 +23,11 @@ public class RemoteWatchers extends AbstractWatchers {
 			RemoteValue annotation = field.getAnnotation(RemoteValue.class);
 			String key = annotation.key();
 			String connStr = annotation.connStr();
-			addConnection(connStr);
 			Anchor anchor = field.getAnnotation(Anchor.class);
 			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
-	}
-	
-	private void addConnection(String connStr) {
-		YAConfigConnection connection = new YAConfigConnection();
-		connection.setRemoteWatchers(this);
-		connection.attach(connStr);
-		connections.put(connStr, connection);
 	}
 
 	public void registerAllWatchers(String connStr) {
@@ -54,9 +46,19 @@ public class RemoteWatchers extends AbstractWatchers {
 			String remoteKey = ConnStrKeyUtil.getKeyNameFromStr(key);
 			String connStr = ConnStrKeyUtil.getConnStrFromStr(key);
 			YAConfigConnection c = connections.get(connStr);
-			if(c != null){
-				c.writeCommand(remoteKey,"".getBytes(),YAMessage.Type.WATCH);
+			if(c == null){
+				addConnection(connStr);
 			}
+			c.writeCommand(remoteKey,"".getBytes(),YAMessage.Type.WATCH);
+		}
+	}
+	
+	private void addConnection(String connStr) {
+		if(!connections.containsKey(connStr)){
+			YAConfigConnection connection = new YAConfigConnection();
+			connection.setRemoteWatchers(this);
+			connection.attach(connStr);
+			connections.put(connStr, connection);
 		}
 	}
 	

@@ -1,11 +1,14 @@
 package com.yaconfig.client;
 
+import org.apache.log4j.PropertyConfigurator;
+
 import com.yaconfig.client.injector.ValueInjector;
 
 import net.sf.cglib.proxy.Enhancer;
 
 public class ConfigFactory {
 	public static Object getConfig(Class<?> configClass){
+		PropertyConfigurator.configure("log4j.properties");
 		Enhancer enhancer = new Enhancer();
 		enhancer.setSuperclass(configClass);
 		enhancer.setCallback(new YAMethodInterceptor());

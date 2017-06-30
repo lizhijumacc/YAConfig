@@ -21,6 +21,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.BackgroundCallback;
+import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.reflections.Reflections;
 import org.reflections.scanners.FieldAnnotationsScanner;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -41,9 +47,11 @@ import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.annotation.InitValueFrom;
 import com.yaconfig.client.annotation.RemoteValue;
+import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.fetcher.FetchCallback;
 import com.yaconfig.client.fetcher.FileFetcher;
 import com.yaconfig.client.fetcher.RemoteFetcher;
+import com.yaconfig.client.fetcher.ZookeeperFetcher;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.util.ConnStrKeyUtil;
 import com.yaconfig.client.util.FileUtil;
@@ -122,6 +130,14 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			registerFields(fields,reflections);
 		}
 		
+		//zk values
+		fields = reflections.getFieldsAnnotatedWith(ZookeeperValue.class);
+		if(fields.size() != 0){
+			ZookeeperWatchers zookeeperWatchers = new ZookeeperWatchers(fields,this);
+			this.zookeeperWatchers = zookeeperWatchers;
+			registerFields(fields,reflections);
+		}
+		
 		//inject static values
 		fields = reflections.getFieldsAnnotatedWith(InitValueFrom.class);
 		for(Field field : fields){
@@ -149,6 +165,13 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 				String key = rv.key();
 				String connStr = rv.connStr();
 				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.REMOTE);
+			}
+		}else if(df.from().equals(DataFrom.ZOOKEEPER)){
+			ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
+			if(zv != null){
+				String key = zv.key();
+				String connStr = zv.connStr();
+				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.ZOOKEEPER);
 			}
 		}
 	}
@@ -257,6 +280,9 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		}else if(from.equals(DataFrom.FILE)){
 			FileFetcher fileFetcher = new FileFetcher(field);
 			fileFetcher.fetch(key, this);
+		}else if(from.equals(DataFrom.ZOOKEEPER)){
+			ZookeeperFetcher zooFetcher = new ZookeeperFetcher(field);
+			zooFetcher.fetch(key, this);
 		}
 	}
 
@@ -281,12 +307,22 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 					e.printStackTrace();
 				}
 			}
+			
+			final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
+			if(zv != null && anchorType.equals(AnchorType.ZOOKEEPER) && from.equals(DataFrom.ZOOKEEPER)){
+				try {
+					syncValue0(data,field,from);
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 
 	private void syncValue0(String data, Field field, DataFrom from) {
 		final FileValue fv = field.getAnnotation(FileValue.class);
 		final RemoteValue rv = field.getAnnotation(RemoteValue.class);
+		final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
 
 		if(fv != null && from != DataFrom.FILE){
 			FileUtil.writeValueToFile(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), data);
@@ -297,6 +333,29 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			connection.attach(rv.connStr());
 			connection.put(rv.key(), data.getBytes(), YAMessage.Type.PUT_NOPROMISE).awaitUninterruptibly();
 			connection.detach();
+		}
+		
+		if(zv != null && from != DataFrom.ZOOKEEPER){
+			RetryPolicy policy = new ExponentialBackoffRetry(1000, 10);
+			CuratorFramework curator = CuratorFrameworkFactory.builder().connectString(zv.connStr())
+					.retryPolicy(policy).build();
+			try {
+				curator.start();
+				System.out.println("write data to zoo");
+				curator.create().inBackground(new BackgroundCallback(){
+
+					@Override
+					public void processResult(CuratorFramework client, CuratorEvent event) throws Exception {
+						System.out.println(event.getType() + " data!!!!");
+					}
+					
+				}).forPath(zv.key(),data.getBytes());
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+			}finally{
+				curator.close();
+			}
 		}
 	}
 
