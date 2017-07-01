@@ -24,10 +24,13 @@ public class ZookeeperFetcher extends AbstractFetcher{
 		RetryPolicy policy = new ExponentialBackoffRetry(1000, 10);  
 	    CuratorFramework curator = CuratorFrameworkFactory.builder().connectString(connStr).retryPolicy(policy).build(); 
 	    try {
+	    	curator.start();
 	    	String data = new String(curator.getData().forPath(key));
 			callback.dataFetched(data, field, DataFrom.ZOOKEEPER);
 		} catch (Exception e) {
 			e.printStackTrace();
+		}finally{
+			curator.close();
 		}
 	}
 

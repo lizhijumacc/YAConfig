@@ -39,7 +39,7 @@ public class ZookeeperWatchers extends AbstractWatchers {
 			String key = annotation.key();
 			String connStr = annotation.connStr();
 			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
+			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.ZOOKEEPER)){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
@@ -66,13 +66,17 @@ public class ZookeeperWatchers extends AbstractWatchers {
 
 				@Override
 				public void childEvent(CuratorFramework client, TreeCacheEvent event) throws Exception {
+					String location = ConnStrKeyUtil.makeLocation(client.getZookeeperClient().getCurrentConnectionString(), key);
 					switch (event.getType()) {
 						case NODE_ADDED:
-							myself.notifyWatchers(key, EventType.ADD, DataFrom.ZOOKEEPER);
+							myself.notifyWatchers(location, EventType.ADD, DataFrom.ZOOKEEPER);
+							break;
 						case NODE_UPDATED:
-							myself.notifyWatchers(key, EventType.UPDATE, DataFrom.ZOOKEEPER);
+							myself.notifyWatchers(location, EventType.UPDATE, DataFrom.ZOOKEEPER);
+							break;
 						case NODE_REMOVED:
-							myself.notifyWatchers(key, EventType.DELETE, DataFrom.ZOOKEEPER);
+							myself.notifyWatchers(location, EventType.DELETE, DataFrom.ZOOKEEPER);
+							break;
 						default:
 							break;
 					}
@@ -112,11 +116,11 @@ public class ZookeeperWatchers extends AbstractWatchers {
 				@Override
 				public void stateChanged(CuratorFramework client, ConnectionState newState) {
 					if(newState == ConnectionState.LOST){
-						System.out.println("connect lost");
+						//System.out.println("connect lost");
 					}else if(newState == ConnectionState.CONNECTED){
-						System.out.println("connect zookeeper!");
+						//System.out.println("connect zookeeper!");
 					}else if(newState == ConnectionState.RECONNECTED){
-						System.out.println("reconnected zookeeper!");
+						//System.out.println("reconnected zookeeper!");
 					}
 				}
 				

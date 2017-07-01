@@ -27,6 +27,7 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.data.Stat;
 import org.reflections.Reflections;
 import org.reflections.scanners.FieldAnnotationsScanner;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -256,7 +257,10 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		}else{
 			AnchorType type = anno.anchor();
 			if(from.equals(DataFrom.REMOTE) && type.equals(AnchorType.REMOTE)
-					|| from.equals(DataFrom.FILE) && type.equals(AnchorType.FILE)){
+					|| from.equals(DataFrom.FILE) && type.equals(AnchorType.FILE)
+					|| from.equals(DataFrom.ZOOKEEPER) && type.equals(AnchorType.ZOOKEEPER)
+					|| from.equals(DataFrom.MYSQL) && type.equals(AnchorType.MYSQL)
+					|| from.equals(DataFrom.REDIS) && type.equals(AnchorType.REDIS)){
 				fetchAndInjectNewValue(key,field,from);
 			}else{
 				return;
@@ -341,16 +345,8 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 					.retryPolicy(policy).build();
 			try {
 				curator.start();
-				System.out.println("write data to zoo");
-				curator.create().inBackground(new BackgroundCallback(){
-
-					@Override
-					public void processResult(CuratorFramework client, CuratorEvent event) throws Exception {
-						System.out.println(event.getType() + " data!!!!");
-					}
-					
-				}).forPath(zv.key(),data.getBytes());
-				
+				curator.createContainers(zv.key());
+				curator.setData().inBackground().forPath(zv.key(),data.getBytes());
 			} catch (Exception e) {
 				e.printStackTrace();
 			}finally{
