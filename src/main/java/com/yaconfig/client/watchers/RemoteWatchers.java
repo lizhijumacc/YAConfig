@@ -6,8 +6,12 @@ import java.util.Set;
 
 import com.yaconfig.client.Constants;
 import com.yaconfig.client.YAConfigConnection;
+import com.yaconfig.client.YAEntry;
 import com.yaconfig.client.annotation.Anchor;
 import com.yaconfig.client.annotation.RemoteValue;
+import com.yaconfig.client.future.AbstractFuture;
+import com.yaconfig.client.future.FutureListener;
+import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
@@ -34,25 +38,40 @@ public class RemoteWatchers extends AbstractWatchers {
 		for(Watcher w : watchers.values()){
 			if(w.getKey().startsWith(connStr)){
 				String remoteKey = ConnStrKeyUtil.getKeyNameFromStr(w.getKey());
-				connections.get(connStr).writeCommand(remoteKey, "".getBytes(), YAMessage.Type.WATCH);
+				watchRemote(remoteKey,connStr);
 			}
 		}
 	}
 	
 	@Override
-	public void watch(String key,WatcherListener... listeners){
+	public void watch(final String key,final WatcherListener... listeners){
 		boolean needRegister = watchLocal(key, listeners);
 		if(needRegister){
 			String remoteKey = ConnStrKeyUtil.getKeyNameFromStr(key);
 			String connStr = ConnStrKeyUtil.getConnStrFromStr(key);
-			YAConfigConnection c = connections.get(connStr);
-			if(c == null){
-				addConnection(connStr);
-			}
-			c.writeCommand(remoteKey,"".getBytes(),YAMessage.Type.WATCH);
+			watchRemote(remoteKey,connStr);
 		}
 	}
 	
+	private void watchRemote(final String remoteKey, final String connStr) {
+		YAConfigConnection c = connections.get(connStr);
+		if(c == null){
+			addConnection(connStr);
+		}
+		//TODO: should add retry policy.
+		YAFuture<YAEntry> f = connections.get(connStr).writeCommand(remoteKey,"".getBytes(),YAMessage.Type.WATCH);
+		f.addListener(new FutureListener<YAEntry>(){
+
+			@Override
+			public void operationCompleted(AbstractFuture<YAEntry> abstractFuture) {
+				if(!abstractFuture.isSuccess()){
+					watchRemote(remoteKey,connStr);
+				}
+			}
+			
+		});
+	}
+
 	private void addConnection(String connStr) {
 		if(!connections.containsKey(connStr)){
 			YAConfigConnection connection = new YAConfigConnection();

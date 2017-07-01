@@ -109,14 +109,14 @@ public class YAConfigServer extends MessageProcessor implements Runnable{
 	@Override
 	public void processMessageImpl(Object msg) {
 		YAMessageWrapper yamsgw = (YAMessageWrapper)msg;
+		ChannelHandlerContext ctx = yamsgw.ctx;
+		YAMessage yamsg = yamsgw.msg;
 		
-		if(!yaconfig.isServing()){
+		if(!yaconfig.isServing() && (yamsg.getType() != YAMessage.Type.WATCH 
+				|| yamsg.getType() != YAMessage.Type.UNWATCH)){
 			nack(yamsgw,"Service is not available now.".getBytes());
 			return;
 		}
-		
-		ChannelHandlerContext ctx = yamsgw.ctx;
-		YAMessage yamsg = yamsgw.msg;
 
 		if(yamsg.getType() == YAMessage.Type.PUT){
 			PutCommand put = new PutCommand("put");

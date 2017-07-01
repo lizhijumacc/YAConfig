@@ -50,7 +50,7 @@ public class YAConfigConnection extends MessageProcessor{
 	
 	private ConcurrentHashMap<Long,YAFuture<YAEntry>> futures;
 	
-	public static final int RECONNECT_WAIT = 5000;
+	public static final int RECONNECT_WAIT = 2000;
 	
 	public static final int MAX_FUTURE_WAIT = 10000;
 	
