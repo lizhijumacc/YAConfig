@@ -19,7 +19,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.yaconfig.client.Constants;
 import com.yaconfig.client.annotation.Anchor;
 import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.injector.AnchorType;

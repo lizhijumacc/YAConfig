@@ -7,6 +7,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -24,10 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.api.BackgroundCallback;
-import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.curator.retry.ExponentialBackoffRetry;
-import org.apache.zookeeper.data.Stat;
 import org.reflections.Reflections;
 import org.reflections.scanners.FieldAnnotationsScanner;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -47,10 +46,12 @@ import com.yaconfig.client.annotation.BeforeChange;
 import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.annotation.InitValueFrom;
+import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.fetcher.FetchCallback;
 import com.yaconfig.client.fetcher.FileFetcher;
+import com.yaconfig.client.fetcher.RedisFetcher;
 import com.yaconfig.client.fetcher.RemoteFetcher;
 import com.yaconfig.client.fetcher.ZookeeperFetcher;
 import com.yaconfig.client.message.YAMessage;
@@ -61,6 +62,8 @@ import com.yaconfig.client.watchers.MySQLWatchers;
 import com.yaconfig.client.watchers.RedisWatchers;
 import com.yaconfig.client.watchers.RemoteWatchers;
 import com.yaconfig.client.watchers.ZookeeperWatchers;
+
+import redis.clients.jedis.Jedis;
 
 public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	
@@ -139,6 +142,14 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			registerFields(fields,reflections);
 		}
 		
+		//redis values
+		fields = reflections.getFieldsAnnotatedWith(RedisValue.class);
+		if(fields.size() != 0){
+			RedisWatchers redisWatchers = new RedisWatchers(fields,this);
+			this.redisWatchers = redisWatchers;
+			registerFields(fields,reflections);
+		}
+		
 		//inject static values
 		fields = reflections.getFieldsAnnotatedWith(InitValueFrom.class);
 		for(Field field : fields){
@@ -173,6 +184,13 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 				String key = zv.key();
 				String connStr = zv.connStr();
 				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.ZOOKEEPER);
+			}
+		}else if(df.from().equals(DataFrom.REDIS)){
+			RedisValue rdv = field.getAnnotation(RedisValue.class);
+			if(rdv != null){
+				String key = rdv.key();
+				String connStr = rdv.connStr();
+				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.REDIS);
 			}
 		}
 	}
@@ -287,6 +305,9 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		}else if(from.equals(DataFrom.ZOOKEEPER)){
 			ZookeeperFetcher zooFetcher = new ZookeeperFetcher(field);
 			zooFetcher.fetch(key, this);
+		}else if(from.equals(DataFrom.REDIS)){
+			RedisFetcher redisFetcher = new RedisFetcher(field);
+			redisFetcher.fetch(key, this);
 		}
 	}
 
@@ -320,6 +341,15 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 					e.printStackTrace();
 				}
 			}
+			
+			final RedisValue rdv = field.getAnnotation(RedisValue.class);
+			if(rdv != null && anchorType.equals(AnchorType.REDIS) && from.equals(DataFrom.REDIS)){
+				try {
+					syncValue0(data,field,from);
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 
@@ -327,6 +357,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		final FileValue fv = field.getAnnotation(FileValue.class);
 		final RemoteValue rv = field.getAnnotation(RemoteValue.class);
 		final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
+		final RedisValue rdv = field.getAnnotation(RedisValue.class);
 
 		if(fv != null && from != DataFrom.FILE){
 			FileUtil.writeValueToFile(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), data);
@@ -351,6 +382,21 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 				e.printStackTrace();
 			}finally{
 				curator.close();
+			}
+		}
+		
+		if(rdv != null && from != DataFrom.REDIS){
+			Jedis jedis = null;
+			try {
+				jedis = new Jedis(new URI(rdv.connStr()), 15000);
+				jedis.connect();
+				jedis.set(rdv.key(), data);
+			} catch (URISyntaxException e) {
+				e.printStackTrace();
+			} finally {
+				if(jedis != null){
+					jedis.close();
+				}
 			}
 		}
 	}
