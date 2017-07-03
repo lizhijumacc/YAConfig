@@ -19,26 +19,67 @@ public class TestConfig{
 
 	//@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
 	//@Anchor(anchor = AnchorType.REMOTE)
-	@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
-	@Anchor(anchor = AnchorType.REDIS)
 	private String value1;
 	
 	private String value2;
 	
-	//@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
+	@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
+	private String remoteValue;
+	
+	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
+	private String fileValue;
+	
+	@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
+	private String redisValue;
+	
+	@MySQLValue(connStr = "jdbc:mysql://127.0.0.1:3306/world?useSSL=false&serverTimezone=UTC", tableName = "testConfig",
+			valueName = "testConfigValue", keyName = "testConfigName",
+			key = "connStr",
+			userName = "root", password = "jmdlbl88")
+	private String mysqlValue;
+	
+	@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
+	private String zookeeperValue;
+	
+	@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
 	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
 	@MySQLValue(connStr = "jdbc:mysql://127.0.0.1:3306/world?useSSL=false&serverTimezone=UTC", tableName = "testConfig",
 			valueName = "testConfigValue", keyName = "testConfigName",
 			key = "connStr",
 			userName = "root", password = "jmdlbl88")
-	//@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
-	//@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
+	@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
+	@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
 	@Anchor(anchor = AnchorType.FILE)
-	@InitValueFrom(from = DataFrom.MYSQL)
+	@InitValueFrom(from = DataFrom.FILE)
 	private String value3;
 	
 	public TestConfig() {
-
+		
+	}
+	
+	@AfterChange(field = "remoteValue")
+	public void remoteChange(){
+		System.out.println("remoteValue change to:" + this.remoteValue);
+	}
+	
+	@AfterChange(field = "fileValue")
+	public void fileChange(){
+		System.out.println("fileValue change to:" + this.fileValue);
+	}
+	
+	@AfterChange(field = "redisValue")
+	public void redisChange(){
+		System.out.println("redisValue change to:" + this.redisValue);
+	}
+	
+	@AfterChange(field = "mysqlValue")
+	public void mysqlChange(){
+		System.out.println("mysqlValue change to:" + this.mysqlValue);
+	}
+	
+	@AfterChange(field = "zookeeperValue")
+	public void zookeeperChange(){
+		System.out.println("zookeeperValue change to:" + this.zookeeperValue);
 	}
 	
 	@BeforeChange(field = "value1")

@@ -165,11 +165,6 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			registerFields(fields,reflections);
 		}
 		
-		//inject static values
-		fields = reflections.getFieldsAnnotatedWith(InitValueFrom.class);
-		for(Field field : fields){
-			initSetValue(field);
-		}
 	}
 
     private void initSetValue(Field field) {
@@ -394,21 +389,6 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			connection.detach();
 		}
 		
-		if(zv != null && from != DataFrom.ZOOKEEPER){
-			RetryPolicy policy = new ExponentialBackoffRetry(1000, 10);
-			CuratorFramework curator = CuratorFrameworkFactory.builder().connectString(zv.connStr())
-					.retryPolicy(policy).build();
-			try {
-				curator.start();
-				curator.createContainers(zv.key());
-				curator.setData().inBackground().forPath(zv.key(),data.getBytes());
-			} catch (Exception e) {
-				e.printStackTrace();
-			}finally{
-				curator.close();
-			}
-		}
-		
 		if(rdv != null && from != DataFrom.REDIS){
 			Jedis jedis = null;
 			try {
@@ -449,6 +429,21 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 					e.printStackTrace();
 				}
 		    }
+		}
+		
+		if(zv != null && from != DataFrom.ZOOKEEPER){
+			RetryPolicy policy = new ExponentialBackoffRetry(1000, 10);
+			CuratorFramework curator = CuratorFrameworkFactory.builder().connectString(zv.connStr())
+					.retryPolicy(policy).build();
+			try {
+				curator.start();
+				curator.createContainers(zv.key());
+				curator.setData().inBackground().forPath(zv.key(),data.getBytes());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}finally{
+				curator.close();
+			}
 		}
 	}
 

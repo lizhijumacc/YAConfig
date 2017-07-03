@@ -151,7 +151,7 @@ public class ServerTest
 		
 		//conf.useValue3FromFile();
 		//Thread.sleep(3000);
-		conf.useValue3FromRemote();
+		//conf.useValue3FromRemote();
 		Thread.sleep(3000);
 		//conf.setValue3("fromMemory1111");
     	for(int i=0;i<0;i++){
