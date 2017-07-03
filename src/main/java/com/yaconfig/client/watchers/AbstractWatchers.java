@@ -49,7 +49,7 @@ public abstract class AbstractWatchers implements Watchers{
 	@Override
 	public abstract void unwatch(String key,WatcherListener...listeners);
 	
-	public void notifyWatchers(String key,EventType event,DataFrom from){
+	public void notifyWatchers(String key,YAEventType event,DataFrom from){
 		for(Watcher w: watchers.values()){
 			String wkey = w.getKey();
 			if(key.matches(wkey) || wkey.equals(key)){

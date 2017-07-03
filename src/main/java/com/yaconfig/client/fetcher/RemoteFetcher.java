@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.yaconfig.client.YAConfigConnection;
 import com.yaconfig.client.YAEntry;
+import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.future.AbstractFuture;
 import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.future.YAFutureListener;
@@ -18,9 +19,10 @@ public class RemoteFetcher extends AbstractFetcher{
 	}
 
 	@Override
-	public void fetch(final String location,final FetchCallback callback) {
-		String connStr = ConnStrKeyUtil.getConnStrFromStr(location);
-		String key = ConnStrKeyUtil.getKeyNameFromStr(location);
+	public void fetch(final FetchCallback callback) {
+		RemoteValue rv = field.getAnnotation(RemoteValue.class);
+		String key = rv.key();
+		String connStr = rv.connStr();
 		
 		final YAConfigConnection connection = new YAConfigConnection();
 		connection.attach(connStr);

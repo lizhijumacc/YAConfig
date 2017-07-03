@@ -27,11 +27,14 @@ public class TestConfig{
 	
 	//@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
 	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
-	//@MySQLValue(connStr = "mysqlconnctstr", tableName = "TestConfigTable", filedName = "testConfig" , keyName = "connectStr")
-	@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
+	@MySQLValue(connStr = "jdbc:mysql://127.0.0.1:3306/world?useSSL=false&serverTimezone=UTC", tableName = "testConfig",
+			valueName = "testConfigValue", keyName = "testConfigName",
+			key = "connStr",
+			userName = "root", password = "jmdlbl88")
+	//@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
 	//@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
-	@Anchor(anchor = AnchorType.REDIS)
-	@InitValueFrom(from = DataFrom.FILE)
+	@Anchor(anchor = AnchorType.FILE)
+	@InitValueFrom(from = DataFrom.MYSQL)
 	private String value3;
 	
 	public TestConfig() {

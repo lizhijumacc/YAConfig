@@ -39,13 +39,13 @@ public class Watcher {
 		}
 	}
 
-	public void notifyListeners(EventType event,String key,DataFrom from) {
+	public void notifyListeners(YAEventType event,String key,DataFrom from) {
 		for(WatcherListener wl : listeners){
-			if(event == EventType.ADD){
+			if(event == YAEventType.ADD){
 				wl.onAdd(this,key,from);
-			}else if(event == EventType.DELETE){
+			}else if(event == YAEventType.DELETE){
 				wl.onDelete(this,key,from);
-			}else if(event == EventType.UPDATE){
+			}else if(event == YAEventType.UPDATE){
 				wl.onUpdate(this,key,from);
 			}
 		}

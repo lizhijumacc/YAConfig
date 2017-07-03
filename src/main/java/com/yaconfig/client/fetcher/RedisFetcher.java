@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.util.ConnStrKeyUtil;
 
@@ -16,9 +17,10 @@ public class RedisFetcher extends AbstractFetcher{
 	}
 
 	@Override
-	public void fetch(String location, FetchCallback callback) {
-		String connStr = ConnStrKeyUtil.getConnStrFromStr(location);
-		String key = ConnStrKeyUtil.getKeyNameFromStr(location);
+	public void fetch(FetchCallback callback) {
+		RedisValue rdv = field.getAnnotation(RedisValue.class);
+		String key = rdv.key();
+		String connStr = rdv.connStr();
 		Jedis jedis = null;
 	
 		try {

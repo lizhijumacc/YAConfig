@@ -28,4 +28,8 @@ public class FieldChangeListener implements WatcherListener{
 	public void onUpdate(Watcher w, String key, DataFrom from) {
 		callback.onUpdate(key,watchField,from);
 	}
+	
+	public Field getField(){
+		return this.watchField;
+	}
 }

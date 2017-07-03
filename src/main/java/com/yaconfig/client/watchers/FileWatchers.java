@@ -53,15 +53,15 @@ public class FileWatchers extends AbstractWatchers {
 		Map<String,Watcher> watchers = findWatchers(changedFile);
         if(kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)){
            for(Entry<String,Watcher> entry : watchers.entrySet()){
-        	   super.notifyWatchers(entry.getKey(), EventType.UPDATE, DataFrom.FILE);
+        	   super.notifyWatchers(entry.getKey(), YAEventType.UPDATE, DataFrom.FILE);
            }
         }else if(kind.equals(StandardWatchEventKinds.ENTRY_CREATE)){
             for(Entry<String,Watcher> entry : watchers.entrySet()){
-            	super.notifyWatchers(entry.getKey(), EventType.ADD, DataFrom.FILE);
+            	super.notifyWatchers(entry.getKey(), YAEventType.ADD, DataFrom.FILE);
             }
         }else if(kind.equals(StandardWatchEventKinds.ENTRY_DELETE)){
             for(Entry<String,Watcher> entry : watchers.entrySet()){
-            	super.notifyWatchers(entry.getKey(), EventType.DELETE, DataFrom.FILE);
+            	super.notifyWatchers(entry.getKey(), YAEventType.DELETE, DataFrom.FILE);
             }
         }
 	}

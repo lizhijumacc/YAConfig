@@ -11,6 +11,6 @@ public abstract class AbstractFetcher implements Fetcher{
 	}
 	
 	@Override
-	public abstract void fetch(String location, FetchCallback callback);
+	public abstract void fetch(FetchCallback callback);
 
 }

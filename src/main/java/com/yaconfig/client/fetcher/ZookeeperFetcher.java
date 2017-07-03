@@ -7,6 +7,7 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 
+import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.util.ConnStrKeyUtil;
 
@@ -17,9 +18,10 @@ public class ZookeeperFetcher extends AbstractFetcher{
 	}
 
 	@Override
-	public void fetch(String location, FetchCallback callback) {
-		String connStr = ConnStrKeyUtil.getConnStrFromStr(location);
-		String key = ConnStrKeyUtil.getKeyNameFromStr(location);
+	public void fetch(FetchCallback callback) {
+		ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
+		String key = zv.key();
+		String connStr = zv.connStr();
 		
 		RetryPolicy policy = new ExponentialBackoffRetry(1000, 10);  
 	    CuratorFramework curator = CuratorFrameworkFactory.builder().connectString(connStr).retryPolicy(policy).build(); 

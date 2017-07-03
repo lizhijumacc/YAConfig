@@ -67,7 +67,9 @@ public abstract class MessageProcessor extends ChannelContainer implements Messa
 		while(!checkChannel(channels.get(id))){
 			try {
 				if(channels.get(id) != null){
-					channels.get(id).wait();
+					synchronized(channels.get(id)){
+						channels.get(id).wait();
+					}
 				}else{
 					//channel is already been removed, just discard the message.
 					return;

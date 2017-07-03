@@ -11,6 +11,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -46,11 +51,13 @@ import com.yaconfig.client.annotation.BeforeChange;
 import com.yaconfig.client.annotation.ControlChange;
 import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.annotation.InitValueFrom;
+import com.yaconfig.client.annotation.MySQLValue;
 import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.fetcher.FetchCallback;
 import com.yaconfig.client.fetcher.FileFetcher;
+import com.yaconfig.client.fetcher.MySQLFetcher;
 import com.yaconfig.client.fetcher.RedisFetcher;
 import com.yaconfig.client.fetcher.RemoteFetcher;
 import com.yaconfig.client.fetcher.ZookeeperFetcher;
@@ -150,6 +157,14 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			registerFields(fields,reflections);
 		}
 		
+		//mysql values
+		fields = reflections.getFieldsAnnotatedWith(MySQLValue.class);
+		if(fields.size() != 0){
+			MySQLWatchers mySQLWatchers = new MySQLWatchers(fields,this);
+			this.mySQLWatchers = mySQLWatchers;
+			registerFields(fields,reflections);
+		}
+		
 		//inject static values
 		fields = reflections.getFieldsAnnotatedWith(InitValueFrom.class);
 		for(Field field : fields){
@@ -166,31 +181,27 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		if(df.from().equals(DataFrom.FILE)){
 			FileValue fv = field.getAnnotation(FileValue.class);
 			if(fv != null){
-				String path_r = field.getAnnotation(FileValue.class).path();
-				String path = Paths.get(path_r).toAbsolutePath().toString();
-				String key = field.getAnnotation(FileValue.class).key();
-				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(path, key), field, DataFrom.FILE);
+				fetchAndInjectNewValue(field, DataFrom.FILE);
 			}
 		}else if(df.from().equals(DataFrom.REMOTE)){
 			RemoteValue rv = field.getAnnotation(RemoteValue.class);
 			if(rv != null){
-				String key = rv.key();
-				String connStr = rv.connStr();
-				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.REMOTE);
+				fetchAndInjectNewValue(field, DataFrom.REMOTE);
 			}
 		}else if(df.from().equals(DataFrom.ZOOKEEPER)){
 			ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
 			if(zv != null){
-				String key = zv.key();
-				String connStr = zv.connStr();
-				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.ZOOKEEPER);
+				fetchAndInjectNewValue(field, DataFrom.ZOOKEEPER);
 			}
 		}else if(df.from().equals(DataFrom.REDIS)){
 			RedisValue rdv = field.getAnnotation(RedisValue.class);
 			if(rdv != null){
-				String key = rdv.key();
-				String connStr = rdv.connStr();
-				fetchAndInjectNewValue(ConnStrKeyUtil.makeLocation(connStr, key), field, DataFrom.REDIS);
+				fetchAndInjectNewValue(field, DataFrom.REDIS);
+			}
+		}else if(df.from().equals(DataFrom.MYSQL)){
+			MySQLValue mv = field.getAnnotation(MySQLValue.class);
+			if(mv != null){
+				fetchAndInjectNewValue(field, DataFrom.MYSQL);
 			}
 		}
 	}
@@ -271,7 +282,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	public void onUpdate(String key, Field field, DataFrom from) {
 		Anchor anno = field.getAnnotation(Anchor.class);
 		if(anno == null){
-			fetchAndInjectNewValue(key,field,from);
+			fetchAndInjectNewValue(field,from);
 		}else{
 			AnchorType type = anno.anchor();
 			if(from.equals(DataFrom.REMOTE) && type.equals(AnchorType.REMOTE)
@@ -279,7 +290,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 					|| from.equals(DataFrom.ZOOKEEPER) && type.equals(AnchorType.ZOOKEEPER)
 					|| from.equals(DataFrom.MYSQL) && type.equals(AnchorType.MYSQL)
 					|| from.equals(DataFrom.REDIS) && type.equals(AnchorType.REDIS)){
-				fetchAndInjectNewValue(key,field,from);
+				fetchAndInjectNewValue(field,from);
 			}else{
 				return;
 			}
@@ -295,19 +306,22 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		}
 	}
 	
-	public void fetchAndInjectNewValue(final String key,final Field field,final DataFrom from){
+	public void fetchAndInjectNewValue(final Field field,final DataFrom from){
 		if(from.equals(DataFrom.REMOTE)){
 			RemoteFetcher remoteFetcher = new RemoteFetcher(field);
-			remoteFetcher.fetch(key, this);
+			remoteFetcher.fetch(this);
 		}else if(from.equals(DataFrom.FILE)){
 			FileFetcher fileFetcher = new FileFetcher(field);
-			fileFetcher.fetch(key, this);
+			fileFetcher.fetch(this);
 		}else if(from.equals(DataFrom.ZOOKEEPER)){
 			ZookeeperFetcher zooFetcher = new ZookeeperFetcher(field);
-			zooFetcher.fetch(key, this);
+			zooFetcher.fetch(this);
 		}else if(from.equals(DataFrom.REDIS)){
 			RedisFetcher redisFetcher = new RedisFetcher(field);
-			redisFetcher.fetch(key, this);
+			redisFetcher.fetch(this);
+		}else if(from.equals(DataFrom.MYSQL)){
+			MySQLFetcher mySQLFetcher = new MySQLFetcher(field);
+			mySQLFetcher.fetch(this);
 		}
 	}
 
@@ -350,6 +364,15 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 					e.printStackTrace();
 				}
 			}
+			
+			final MySQLValue mv = field.getAnnotation(MySQLValue.class);
+			if(mv != null && anchorType.equals(AnchorType.MYSQL) && from.equals(DataFrom.MYSQL)){
+				try {
+					syncValue0(data,field,from);
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 
@@ -358,6 +381,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		final RemoteValue rv = field.getAnnotation(RemoteValue.class);
 		final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
 		final RedisValue rdv = field.getAnnotation(RedisValue.class);
+		final MySQLValue mv = field.getAnnotation(MySQLValue.class);
 
 		if(fv != null && from != DataFrom.FILE){
 			FileUtil.writeValueToFile(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), data);
@@ -398,6 +422,33 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 					jedis.close();
 				}
 			}
+		}
+		
+		if(mv != null && from != DataFrom.MYSQL){
+			String keyName = mv.keyName();
+			String valueName = mv.valueName();
+			String key = mv.key();
+		    String username = mv.userName();
+		    String password = mv.password();
+			String tableName = mv.tableName();
+			String connStr = mv.connStr();
+			String sql = "update " + tableName + " set " + valueName + " = '" +
+							data + "' where " + keyName + " = '" + key + "'";
+
+		    Connection conn = null;
+		    try {
+		        conn = (Connection) DriverManager.getConnection(connStr, username, password);
+		        PreparedStatement pstmt = (PreparedStatement)conn.prepareStatement(sql);
+		        pstmt.execute();
+		    } catch (SQLException e) {
+		        e.printStackTrace();
+		    }finally{
+		    	try {
+					if(conn!=null)conn.close();
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+		    }
 		}
 	}
 

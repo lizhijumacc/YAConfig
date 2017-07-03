@@ -60,7 +60,7 @@ public class YAMethodInterceptor implements MethodInterceptor {
 	}
 
 	private void injectDataFrom(String key,Field field,DataFrom from) {
-		ValueInjector.getInstance().fetchAndInjectNewValue(key, field, from);
+		ValueInjector.getInstance().fetchAndInjectNewValue(field, from);
 	}
 
 	private void processSetValue(Method method, Object object) throws Throwable {

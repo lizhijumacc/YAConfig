@@ -69,13 +69,13 @@ public class ZookeeperWatchers extends AbstractWatchers {
 					String location = ConnStrKeyUtil.makeLocation(client.getZookeeperClient().getCurrentConnectionString(), key);
 					switch (event.getType()) {
 						case NODE_ADDED:
-							myself.notifyWatchers(location, EventType.ADD, DataFrom.ZOOKEEPER);
+							myself.notifyWatchers(location, YAEventType.ADD, DataFrom.ZOOKEEPER);
 							break;
 						case NODE_UPDATED:
-							myself.notifyWatchers(location, EventType.UPDATE, DataFrom.ZOOKEEPER);
+							myself.notifyWatchers(location, YAEventType.UPDATE, DataFrom.ZOOKEEPER);
 							break;
 						case NODE_REMOVED:
-							myself.notifyWatchers(location, EventType.DELETE, DataFrom.ZOOKEEPER);
+							myself.notifyWatchers(location, YAEventType.DELETE, DataFrom.ZOOKEEPER);
 							break;
 						default:
 							break;

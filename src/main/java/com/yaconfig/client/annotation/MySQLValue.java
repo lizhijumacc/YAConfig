@@ -12,9 +12,15 @@ import java.lang.annotation.Target;
 public @interface MySQLValue {
 	String connStr();
 
-	String filedName();
+	String keyName();
+	
+	String valueName();
 
 	String tableName();
-
-	String keyName();
+	
+	String key();
+	
+	String userName();
+	
+	String password();
 }

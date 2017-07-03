@@ -84,11 +84,11 @@ public class RedisWatchers extends AbstractWatchers {
 							@Override
 							public void onPMessage(String patten,String channel, String message) {
 								String key = channel.substring(channel.lastIndexOf(":") + 1);
-								EventType event;
+								YAEventType event;
 								if(message.equals("expired") || message.equals("del")){
-									event = EventType.DELETE;
+									event = YAEventType.DELETE;
 								}else if(message.equals("set")){
-									event = EventType.UPDATE;
+									event = YAEventType.UPDATE;
 								}else{
 									return;
 								}
