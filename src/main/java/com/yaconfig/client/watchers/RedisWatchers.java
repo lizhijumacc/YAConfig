@@ -13,7 +13,6 @@ import org.reflections.Reflections;
 
 import com.yaconfig.client.Constants;
 import com.yaconfig.client.annotation.Anchor;
-import com.yaconfig.client.annotation.MySQLValue;
 import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.DataFrom;
@@ -24,9 +23,8 @@ import com.yaconfig.client.util.ConnStrKeyUtil;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
-import com.yaconfig.client.Constants;
 
-@WatchersType(from = Constants.fromRedis)
+@WatchersType(from = DataFrom.REDIS)
 public class RedisWatchers extends AbstractWatchers {
 
 	Map<String,Jedis> connections = new ConcurrentHashMap<String,Jedis>();
@@ -50,7 +48,7 @@ public class RedisWatchers extends AbstractWatchers {
 			String key = annotation.key();
 			String connStr = annotation.connStr();
 			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REDIS)){
+			if(anchor == null || anchor != null && anchor.anchor() == AnchorType.REDIS){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}

@@ -7,7 +7,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.reflections.Reflections;
 
-import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 
 public abstract class AbstractWatchers implements Watchers{
@@ -57,7 +56,7 @@ public abstract class AbstractWatchers implements Watchers{
 	@Override
 	public abstract Set<Field> init(Reflections rfs,FieldChangeCallback callback);
 	
-	public void notifyWatchers(String key,YAEventType event,DataFrom from){
+	public void notifyWatchers(String key,YAEventType event,int from){
 		for(Watcher w: watchers.values()){
 			String wkey = w.getKey();
 			if(key.matches(wkey) || wkey.equals(key)){

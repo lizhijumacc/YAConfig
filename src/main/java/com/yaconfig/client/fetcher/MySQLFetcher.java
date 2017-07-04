@@ -10,13 +10,15 @@ import java.sql.SQLException;
 import com.yaconfig.client.annotation.MySQLValue;
 import com.yaconfig.client.injector.DataFrom;
 
+@FetcherType(from = DataFrom.MYSQL)
 public class MySQLFetcher extends AbstractFetcher{
-	public MySQLFetcher(Field field) {
-		super(field);
+	
+	public MySQLFetcher() {
+		
 	}
 
 	@Override
-	public void fetch(FetchCallback callback) {
+	public void fetch(Field field,FetchCallback callback) {
 		final MySQLValue mv = field.getAnnotation(MySQLValue.class);
 		String keyName = mv.keyName();
 		String valueName = mv.valueName();

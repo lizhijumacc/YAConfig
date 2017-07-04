@@ -24,9 +24,8 @@ import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
 import com.yaconfig.client.util.ConnStrKeyUtil;
-import com.yaconfig.client.Constants;
 
-@WatchersType(from = Constants.fromZookeeper)
+@WatchersType(from = DataFrom.ZOOKEEPER)
 public class ZookeeperWatchers extends AbstractWatchers {
 	
 	HashMap<String,CuratorFramework> connections = new HashMap<String,CuratorFramework>();
@@ -53,7 +52,7 @@ public class ZookeeperWatchers extends AbstractWatchers {
 			String key = annotation.key();
 			String connStr = annotation.connStr();
 			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.ZOOKEEPER)){
+			if(anchor == null || anchor != null && anchor.anchor() == AnchorType.ZOOKEEPER){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}

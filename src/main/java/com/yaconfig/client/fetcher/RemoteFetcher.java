@@ -11,15 +11,16 @@ import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.future.YAFutureListener;
 import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.message.YAMessage;
-import com.yaconfig.client.util.ConnStrKeyUtil;
 
+@FetcherType(from = DataFrom.REMOTE)
 public class RemoteFetcher extends AbstractFetcher{
-	public RemoteFetcher(Field field) {
-		super(field);
+	
+	public RemoteFetcher() {
+		
 	}
 
 	@Override
-	public void fetch(final FetchCallback callback) {
+	public void fetch(final Field field,final FetchCallback callback) {
 		RemoteValue rv = field.getAnnotation(RemoteValue.class);
 		String key = rv.key();
 		String connStr = rv.connStr();

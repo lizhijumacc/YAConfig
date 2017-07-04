@@ -6,18 +6,18 @@ import java.net.URISyntaxException;
 
 import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.injector.DataFrom;
-import com.yaconfig.client.util.ConnStrKeyUtil;
 
 import redis.clients.jedis.Jedis;
 
+@FetcherType(from = DataFrom.REDIS)
 public class RedisFetcher extends AbstractFetcher{
 
-	public RedisFetcher(Field field) {
-		super(field);
+	public RedisFetcher() {
+		
 	}
 
 	@Override
-	public void fetch(FetchCallback callback) {
+	public void fetch(Field field,FetchCallback callback) {
 		RedisValue rdv = field.getAnnotation(RedisValue.class);
 		String key = rdv.key();
 		String connStr = rdv.connStr();

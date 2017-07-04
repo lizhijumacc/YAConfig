@@ -9,16 +9,16 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 
 import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.injector.DataFrom;
-import com.yaconfig.client.util.ConnStrKeyUtil;
 
+@FetcherType(from = DataFrom.ZOOKEEPER)
 public class ZookeeperFetcher extends AbstractFetcher{
 
-	public ZookeeperFetcher(Field field) {
-		super(field);
+	public ZookeeperFetcher() {
+		
 	}
 
 	@Override
-	public void fetch(FetchCallback callback) {
+	public void fetch(Field field,FetchCallback callback) {
 		ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
 		String key = zv.key();
 		String connStr = zv.connStr();

@@ -3,8 +3,6 @@ package com.yaconfig.client.watchers;
 import java.util.Collection;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import com.yaconfig.client.injector.DataFrom;
-
 public class Watcher {
 	private String key;
 	private Collection<WatcherListener> listeners = new CopyOnWriteArrayList<WatcherListener>();
@@ -39,7 +37,7 @@ public class Watcher {
 		}
 	}
 
-	public void notifyListeners(YAEventType event,String key,DataFrom from) {
+	public void notifyListeners(YAEventType event,String key,int from) {
 		for(WatcherListener wl : listeners){
 			if(event == YAEventType.ADD){
 				wl.onAdd(this,key,from);

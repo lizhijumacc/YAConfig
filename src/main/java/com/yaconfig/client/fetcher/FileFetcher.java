@@ -8,14 +8,15 @@ import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.util.ConnStrKeyUtil;
 import com.yaconfig.client.util.FileUtil;
 
+@FetcherType(from = DataFrom.FILE)
 public class FileFetcher extends AbstractFetcher{
 
-	public FileFetcher(Field field) {
-		super(field);
+	public FileFetcher() {
+
 	}
 
 	@Override
-	public void fetch(FetchCallback callback) {
+	public void fetch(Field field,FetchCallback callback) {
 		String path_r = field.getAnnotation(FileValue.class).path();
 		String path = Paths.get(path_r).toAbsolutePath().toString();
 		String key = field.getAnnotation(FileValue.class).key();

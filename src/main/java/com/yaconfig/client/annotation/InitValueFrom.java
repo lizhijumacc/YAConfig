@@ -12,5 +12,5 @@ import com.yaconfig.client.injector.DataFrom;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface InitValueFrom {
-	DataFrom from();
+	int from();
 }

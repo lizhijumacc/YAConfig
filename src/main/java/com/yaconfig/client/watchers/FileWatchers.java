@@ -28,9 +28,8 @@ import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
 import com.yaconfig.client.util.ConnStrKeyUtil;
-import com.yaconfig.client.Constants;
 
-@WatchersType(from = Constants.fromFile)
+@WatchersType(from = DataFrom.FILE)
 public class FileWatchers extends AbstractWatchers {
 	HashMap<Path,ExecutorService> pathSet;
 	HashMap<Path,Set<Watcher>> pathMapWatchers;
@@ -57,7 +56,7 @@ public class FileWatchers extends AbstractWatchers {
 				String path = Paths.get(path_r).toAbsolutePath().toString();
 				String key = field.getAnnotation(FileValue.class).key();
 				Anchor anchor = field.getAnnotation(Anchor.class);
-				if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.FILE)){
+				if(anchor == null || anchor != null && anchor.anchor() == AnchorType.FILE){
 					watch(ConnStrKeyUtil.makeLocation(path, key), new FieldChangeListener(field,callback));
 				}
 			}

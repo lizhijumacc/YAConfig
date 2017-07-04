@@ -34,32 +34,16 @@ public class YAMethodInterceptor implements MethodInterceptor {
 		if(gm != null){
 			String fieldName = gm.field();
 			Field f = method.getDeclaringClass().getDeclaredField(fieldName);
-			FileValue fv = f.getAnnotation(FileValue.class);
-			RemoteValue rv = f.getAnnotation(RemoteValue.class);
-			if(f != null){
-				DataFrom from = gm.from();
-				if(from != null){
-					if(from.equals(DataFrom.FILE) && fv != null){
-						injectDataFrom(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), f ,from);
-					}
-					if(from.equals(DataFrom.REMOTE) && rv != null){
-						injectDataFrom(ConnStrKeyUtil.makeLocation(rv.connStr(),rv.key()), f ,from);
-					}
-				}else{
-					Anchor anchor = f.getAnnotation(Anchor.class);
-					if(anchor != null && anchor.anchor().equals(AnchorType.FILE)
-							&& fv != null){
-						injectDataFrom(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()),f,DataFrom.FILE);
-					}else if(anchor != null && anchor.anchor().equals(AnchorType.REMOTE)
-							&& rv != null){
-						injectDataFrom(ConnStrKeyUtil.makeLocation(rv.connStr(),rv.key()),f,DataFrom.REMOTE);
-					}
-				}
+			Anchor anchor = f.getAnnotation(Anchor.class);
+			if(anchor != null){
+				injectDataFrom(f,anchor.anchor());
+			}else{
+				injectDataFrom(f,gm.from());
 			}
 		}
 	}
 
-	private void injectDataFrom(String key,Field field,DataFrom from) {
+	private void injectDataFrom(Field field,int from) {
 		ValueInjector.getInstance().fetchAndInjectNewValue(field, from);
 	}
 
@@ -71,7 +55,7 @@ public class YAMethodInterceptor implements MethodInterceptor {
 			Field f = method.getDeclaringClass().getDeclaredField(fieldName);
 			if(f != null){
 				Anchor anchor = f.getAnnotation(Anchor.class);
-				if(anchor != null && anchor.anchor().equals(AnchorType.MEMORY)){
+				if(anchor != null && anchor.anchor() == AnchorType.MEMORY){
 					FileValue fv = f.getAnnotation(FileValue.class);
 					if(fv != null){
 						FileUtil.writeValueToFile(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), newValue);

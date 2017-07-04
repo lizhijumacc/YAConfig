@@ -12,5 +12,5 @@ import com.yaconfig.client.injector.AnchorType;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface Anchor {
-	AnchorType anchor();
+	int anchor();
 }

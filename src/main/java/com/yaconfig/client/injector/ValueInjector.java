@@ -56,6 +56,8 @@ import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.annotation.RemoteValue;
 import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.fetcher.FetchCallback;
+import com.yaconfig.client.fetcher.Fetcher;
+import com.yaconfig.client.fetcher.FetcherType;
 import com.yaconfig.client.fetcher.FileFetcher;
 import com.yaconfig.client.fetcher.MySQLFetcher;
 import com.yaconfig.client.fetcher.RedisFetcher;
@@ -79,6 +81,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	public ReferenceQueue<Object> queue;
 	private volatile static ValueInjector instance;
 	private List<Watchers> watchers;
+	private List<Fetcher> fetchers;
 	
 	private Map<Field,Set<Method>> beforeInjectMethods;
 	private Map<Field,Set<Method>> afterInjectMethods;
@@ -115,6 +118,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		this.afterInjectMethods = new HashMap<Field,Set<Method>>();
 		this.controlInjectMethods = new HashMap<Field,Set<Method>>();
 		this.watchers = new ArrayList<Watchers>();
+		this.fetchers = new ArrayList<Fetcher>(); 
 		this.initScan();
 	}
 	
@@ -124,6 +128,15 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		for(Class<?> c : clazzs){
 			try {
 				this.watchers.add((Watchers)c.newInstance());
+			} catch (InstantiationException | IllegalAccessException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		clazzs = reflections.getTypesAnnotatedWith(FetcherType.class);
+		for(Class<?> c : clazzs){
+			try {
+				this.fetchers.add((Fetcher)c.newInstance());
 			} catch (InstantiationException | IllegalAccessException e) {
 				e.printStackTrace();
 			}
@@ -143,33 +156,9 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
     	if(df == null){
     		return;
     	}
-
-		if(df.from().equals(DataFrom.FILE)){
-			FileValue fv = field.getAnnotation(FileValue.class);
-			if(fv != null){
-				fetchAndInjectNewValue(field, DataFrom.FILE);
-			}
-		}else if(df.from().equals(DataFrom.REMOTE)){
-			RemoteValue rv = field.getAnnotation(RemoteValue.class);
-			if(rv != null){
-				fetchAndInjectNewValue(field, DataFrom.REMOTE);
-			}
-		}else if(df.from().equals(DataFrom.ZOOKEEPER)){
-			ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
-			if(zv != null){
-				fetchAndInjectNewValue(field, DataFrom.ZOOKEEPER);
-			}
-		}else if(df.from().equals(DataFrom.REDIS)){
-			RedisValue rdv = field.getAnnotation(RedisValue.class);
-			if(rdv != null){
-				fetchAndInjectNewValue(field, DataFrom.REDIS);
-			}
-		}else if(df.from().equals(DataFrom.MYSQL)){
-			MySQLValue mv = field.getAnnotation(MySQLValue.class);
-			if(mv != null){
-				fetchAndInjectNewValue(field, DataFrom.MYSQL);
-			}
-		}
+    	
+    	this.fetchAndInjectNewValue(field, df.from());
+    
 	}
 
 	private void registerFields(Set<Field> fields, Reflections reflections) {
@@ -240,31 +229,25 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
     }
 
 	@Override
-	public void onAdd(String key, Field field, DataFrom from) {
+	public void onAdd(String key, Field field, int from) {
 		onUpdate(key,field,from);
 	}
 
 	@Override
-	public void onUpdate(String key, Field field, DataFrom from) {
+	public void onUpdate(String key, Field field, int from) {
 		Anchor anno = field.getAnnotation(Anchor.class);
 		if(anno == null){
 			fetchAndInjectNewValue(field,from);
 		}else{
-			AnchorType type = anno.anchor();
-			if(from.equals(DataFrom.REMOTE) && type.equals(AnchorType.REMOTE)
-					|| from.equals(DataFrom.FILE) && type.equals(AnchorType.FILE)
-					|| from.equals(DataFrom.ZOOKEEPER) && type.equals(AnchorType.ZOOKEEPER)
-					|| from.equals(DataFrom.MYSQL) && type.equals(AnchorType.MYSQL)
-					|| from.equals(DataFrom.REDIS) && type.equals(AnchorType.REDIS)){
+			int type = anno.anchor();
+			if(from == type){
 				fetchAndInjectNewValue(field,from);
-			}else{
-				return;
 			}
 		}
 	}
 
 	@Override
-	public void onDelete(String key, Field field, DataFrom from) {
+	public void onDelete(String key, Field field, int from) {
 		try {
 			injectValue(null,field);
 		} catch (IllegalArgumentException e) {
@@ -272,31 +255,21 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		}
 	}
 	
-	public void fetchAndInjectNewValue(final Field field,final DataFrom from){
-		if(from.equals(DataFrom.REMOTE)){
-			RemoteFetcher remoteFetcher = new RemoteFetcher(field);
-			remoteFetcher.fetch(this);
-		}else if(from.equals(DataFrom.FILE)){
-			FileFetcher fileFetcher = new FileFetcher(field);
-			fileFetcher.fetch(this);
-		}else if(from.equals(DataFrom.ZOOKEEPER)){
-			ZookeeperFetcher zooFetcher = new ZookeeperFetcher(field);
-			zooFetcher.fetch(this);
-		}else if(from.equals(DataFrom.REDIS)){
-			RedisFetcher redisFetcher = new RedisFetcher(field);
-			redisFetcher.fetch(this);
-		}else if(from.equals(DataFrom.MYSQL)){
-			MySQLFetcher mySQLFetcher = new MySQLFetcher(field);
-			mySQLFetcher.fetch(this);
-		}
+	public void fetchAndInjectNewValue(Field field, int from) {
+    	for(Fetcher f : fetchers){
+    		FetcherType ft = f.getClass().getAnnotation(FetcherType.class);
+    		if(from == ft.from()){
+    			f.fetch(field, this);
+    		}
+    	}
 	}
 
-	protected void syncValue(String data, Field field, DataFrom from) {
+	protected void syncValue(String data, Field field, int from) {
 		Anchor anchor = field.getAnnotation(Anchor.class);
 		if(anchor != null){
-			AnchorType anchorType = anchor.anchor();
+			int anchorType = anchor.anchor();
 			final FileValue fv = field.getAnnotation(FileValue.class);
-			if(fv != null && anchorType.equals(AnchorType.FILE) && from.equals(DataFrom.FILE)){
+			if(fv != null && anchorType == AnchorType.FILE && from == DataFrom.FILE){
 				try {
 					syncValue0(data,field,from);
 				} catch (IllegalArgumentException e) {
@@ -305,7 +278,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			}
 			
 			final RemoteValue rv = field.getAnnotation(RemoteValue.class);
-			if(rv != null && anchorType.equals(AnchorType.REMOTE) && from.equals(DataFrom.REMOTE)){
+			if(rv != null && anchorType == AnchorType.REMOTE && from == DataFrom.REMOTE){
 				try {
 					syncValue0(data,field,from);
 				} catch (IllegalArgumentException e) {
@@ -314,7 +287,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			}
 			
 			final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
-			if(zv != null && anchorType.equals(AnchorType.ZOOKEEPER) && from.equals(DataFrom.ZOOKEEPER)){
+			if(zv != null && anchorType == AnchorType.ZOOKEEPER && from == DataFrom.ZOOKEEPER){
 				try {
 					syncValue0(data,field,from);
 				} catch (IllegalArgumentException e) {
@@ -323,7 +296,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			}
 			
 			final RedisValue rdv = field.getAnnotation(RedisValue.class);
-			if(rdv != null && anchorType.equals(AnchorType.REDIS) && from.equals(DataFrom.REDIS)){
+			if(rdv != null && anchorType == AnchorType.REDIS && from == DataFrom.REDIS){
 				try {
 					syncValue0(data,field,from);
 				} catch (IllegalArgumentException e) {
@@ -332,7 +305,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			}
 			
 			final MySQLValue mv = field.getAnnotation(MySQLValue.class);
-			if(mv != null && anchorType.equals(AnchorType.MYSQL) && from.equals(DataFrom.MYSQL)){
+			if(mv != null && anchorType == AnchorType.MYSQL && from == DataFrom.MYSQL){
 				try {
 					syncValue0(data,field,from);
 				} catch (IllegalArgumentException e) {
@@ -342,7 +315,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		}
 	}
 
-	private void syncValue0(String data, Field field, DataFrom from) {
+	private void syncValue0(String data, Field field, int from) {
 		final FileValue fv = field.getAnnotation(FileValue.class);
 		final RemoteValue rv = field.getAnnotation(RemoteValue.class);
 		final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
@@ -515,7 +488,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	}
 
 	@Override
-	public void dataFetched(String data, Field field, DataFrom from) {
+	public void dataFetched(String data, Field field, int from) {
 		try {
 			injectValue(data,field);
 		} catch (IllegalArgumentException e) {

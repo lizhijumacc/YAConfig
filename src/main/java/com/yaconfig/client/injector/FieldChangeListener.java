@@ -17,15 +17,15 @@ public class FieldChangeListener implements WatcherListener{
 		this.callback = callback;
 	}
 	
-	public void onDelete(Watcher w, String key, DataFrom from) {
+	public void onDelete(Watcher w, String key, int from) {
 		callback.onDelete(key,watchField,from);
 	}
 
-	public void onAdd(Watcher w, String key, DataFrom from) {
+	public void onAdd(Watcher w, String key, int from) {
 		callback.onAdd(key,watchField,from);
 	}
 
-	public void onUpdate(Watcher w, String key, DataFrom from) {
+	public void onUpdate(Watcher w, String key, int from) {
 		callback.onUpdate(key,watchField,from);
 	}
 	

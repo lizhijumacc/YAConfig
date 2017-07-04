@@ -15,13 +15,13 @@ import com.yaconfig.client.future.AbstractFuture;
 import com.yaconfig.client.future.FutureListener;
 import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.injector.AnchorType;
+import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.util.ConnStrKeyUtil;
-import com.yaconfig.client.Constants;
 
-@WatchersType(from = Constants.fromRemote)
+@WatchersType(from = DataFrom.REMOTE)
 public class RemoteWatchers extends AbstractWatchers {
 	
 	HashMap<String,YAConfigConnection> connections = new HashMap<String,YAConfigConnection>();
@@ -42,7 +42,7 @@ public class RemoteWatchers extends AbstractWatchers {
 			String key = annotation.key();
 			String connStr = annotation.connStr();
 			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.REMOTE)){
+			if(anchor == null || anchor != null && anchor.anchor() == AnchorType.REMOTE){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}

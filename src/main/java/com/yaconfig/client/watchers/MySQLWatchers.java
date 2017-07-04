@@ -31,9 +31,8 @@ import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
-import com.yaconfig.client.Constants;
 
-@WatchersType(from = Constants.fromMySQL)
+@WatchersType(from = DataFrom.MYSQL)
 public class MySQLWatchers extends AbstractWatchers {
 	
 	MySQLWatchers myself;
@@ -58,7 +57,7 @@ public class MySQLWatchers extends AbstractWatchers {
 			String key = annotation.key();
 			String connStr = annotation.connStr();
 			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor().equals(AnchorType.MYSQL)){
+			if(anchor == null || anchor != null && anchor.anchor() == AnchorType.MYSQL){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + tableName + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
