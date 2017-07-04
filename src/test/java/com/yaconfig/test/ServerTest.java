@@ -1,21 +1,12 @@
 package com.yaconfig.test;
 
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.yaconfig.client.ConfigFactory;
-import com.yaconfig.client.YAConfig;
-import com.yaconfig.client.YAConfigConnection;
-import com.yaconfig.client.YAEntry;
-import com.yaconfig.client.annotation.RemoteValue;
-import com.yaconfig.client.future.AbstractFuture;
-import com.yaconfig.client.future.FutureListener;
-import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.message.YAMessage;
-import com.yaconfig.client.watchers.Watcher;
-import com.yaconfig.client.watchers.WatcherListener;
+import com.yaconfig.core.ConfigFactory;
+import com.yaconfig.core.YAConfig;
 
 import io.netty.channel.ChannelFuture;
 import junit.framework.Test;

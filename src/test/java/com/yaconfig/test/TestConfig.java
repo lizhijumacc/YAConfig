@@ -1,19 +1,19 @@
 package com.yaconfig.test;
 
-import com.yaconfig.client.annotation.AfterChange;
-import com.yaconfig.client.annotation.Anchor;
-import com.yaconfig.client.annotation.BeforeChange;
-import com.yaconfig.client.annotation.ControlChange;
-import com.yaconfig.client.annotation.FileValue;
-import com.yaconfig.client.annotation.Use;
-import com.yaconfig.client.annotation.ZookeeperValue;
-import com.yaconfig.client.annotation.InitValueFrom;
-import com.yaconfig.client.annotation.MySQLValue;
-import com.yaconfig.client.annotation.RedisValue;
-import com.yaconfig.client.annotation.RemoteValue;
-import com.yaconfig.client.annotation.SetValue;
-import com.yaconfig.client.injector.AnchorType;
-import com.yaconfig.client.injector.DataFrom;
+import com.yaconfig.core.annotation.AfterChange;
+import com.yaconfig.core.annotation.Anchor;
+import com.yaconfig.core.annotation.BeforeChange;
+import com.yaconfig.core.annotation.ControlChange;
+import com.yaconfig.core.annotation.FileValue;
+import com.yaconfig.core.annotation.InitValueFrom;
+import com.yaconfig.core.annotation.MySQLValue;
+import com.yaconfig.core.annotation.RedisValue;
+import com.yaconfig.core.annotation.RemoteValue;
+import com.yaconfig.core.annotation.SetValue;
+import com.yaconfig.core.annotation.Use;
+import com.yaconfig.core.annotation.ZookeeperValue;
+import com.yaconfig.core.injector.AnchorType;
+import com.yaconfig.core.injector.DataFrom;
 
 public class TestConfig{
 
