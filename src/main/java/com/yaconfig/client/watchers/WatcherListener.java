@@ -1,7 +1,0 @@
-package com.yaconfig.client.watchers;
-
-public interface WatcherListener {
-	void onDelete(Watcher w, String key, int from);
-	void onAdd(Watcher w, String key, int from);
-	void onUpdate(Watcher w, String key, int from);
-}
