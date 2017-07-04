@@ -9,8 +9,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.reflections.Reflections;
+
 import com.yaconfig.client.Constants;
 import com.yaconfig.client.annotation.Anchor;
+import com.yaconfig.client.annotation.MySQLValue;
 import com.yaconfig.client.annotation.RedisValue;
 import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.DataFrom;
@@ -21,15 +24,27 @@ import com.yaconfig.client.util.ConnStrKeyUtil;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
+import com.yaconfig.client.Constants;
 
+@WatchersType(from = Constants.fromRedis)
 public class RedisWatchers extends AbstractWatchers {
 
 	Map<String,Jedis> connections = new ConcurrentHashMap<String,Jedis>();
 	Map<Jedis,ExecutorService> watchTask = new ConcurrentHashMap<Jedis,ExecutorService>();
 	RedisWatchers myself;
 	
-	public RedisWatchers(Set<Field> fields, FieldChangeCallback callback) {
+	public RedisWatchers(){
+		
+	}
+	
+	public RedisWatchers(Reflections rfs, FieldChangeCallback callback) {
+		this.init(rfs, callback);
+	}
+	
+	@Override
+	public Set<Field> init(Reflections rfs, FieldChangeCallback callback) {
 		myself = this;
+		Set<Field> fields = rfs.getFieldsAnnotatedWith(RedisValue.class);
 		for(final Field field : fields){
 			RedisValue annotation = field.getAnnotation(RedisValue.class);
 			String key = annotation.key();
@@ -39,6 +54,8 @@ public class RedisWatchers extends AbstractWatchers {
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
+		
+		return fields;
 	}
 
 	@Override

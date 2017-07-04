@@ -14,6 +14,7 @@ import org.apache.curator.framework.recipes.cache.TreeCacheListener;
 import org.apache.curator.framework.state.ConnectionState;
 import org.apache.curator.framework.state.ConnectionStateListener;
 import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.reflections.Reflections;
 
 import com.yaconfig.client.Constants;
 import com.yaconfig.client.annotation.Anchor;
@@ -23,7 +24,9 @@ import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
 import com.yaconfig.client.util.ConnStrKeyUtil;
+import com.yaconfig.client.Constants;
 
+@WatchersType(from = Constants.fromZookeeper)
 public class ZookeeperWatchers extends AbstractWatchers {
 	
 	HashMap<String,CuratorFramework> connections = new HashMap<String,CuratorFramework>();
@@ -31,9 +34,20 @@ public class ZookeeperWatchers extends AbstractWatchers {
 	HashMap<TreeCache,String> cacheMapKeys = new HashMap<TreeCache,String>();
 	
 	public ZookeeperWatchers myself;
+	
+	public ZookeeperWatchers(){
+		
+	}
+	
+	public ZookeeperWatchers(Reflections rfs,FieldChangeCallback callback){
+		this.init(rfs, callback);
+	}
 
-	public ZookeeperWatchers(Set<Field> fields,FieldChangeCallback callback){
+	@Override
+	public Set<Field> init(Reflections rfs,FieldChangeCallback callback){
 		myself = this;
+		
+		Set<Field> fields = rfs.getFieldsAnnotatedWith(ZookeeperValue.class);
 		for(final Field field : fields){
 			ZookeeperValue annotation = field.getAnnotation(ZookeeperValue.class);
 			String key = annotation.key();
@@ -43,6 +57,8 @@ public class ZookeeperWatchers extends AbstractWatchers {
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
+		
+		return fields;
 	}
 	
 	@Override

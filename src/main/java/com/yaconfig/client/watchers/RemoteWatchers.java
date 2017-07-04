@@ -4,6 +4,8 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Set;
 
+import org.reflections.Reflections;
+
 import com.yaconfig.client.Constants;
 import com.yaconfig.client.YAConfigConnection;
 import com.yaconfig.client.YAEntry;
@@ -17,12 +19,24 @@ import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.util.ConnStrKeyUtil;
+import com.yaconfig.client.Constants;
 
+@WatchersType(from = Constants.fromRemote)
 public class RemoteWatchers extends AbstractWatchers {
 	
 	HashMap<String,YAConfigConnection> connections = new HashMap<String,YAConfigConnection>();
 	
-	public RemoteWatchers(Set<Field> fields,FieldChangeCallback callback){
+	public RemoteWatchers(){
+		
+	}
+	
+	public RemoteWatchers(Reflections rfs,FieldChangeCallback callback){
+		this.init(rfs, callback);
+	}
+	
+	@Override
+	public Set<Field> init(Reflections rfs,FieldChangeCallback callback){
+		Set<Field> fields = rfs.getFieldsAnnotatedWith(RemoteValue.class);
 		for(final Field field : fields){
 			RemoteValue annotation = field.getAnnotation(RemoteValue.class);
 			String key = annotation.key();
@@ -32,6 +46,8 @@ public class RemoteWatchers extends AbstractWatchers {
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
+		
+		return fields;
 	}
 
 	public void registerAllWatchers(String connStr) {

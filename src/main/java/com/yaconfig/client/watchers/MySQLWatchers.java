@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.reflections.Reflections;
+
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.BinaryLogClient.EventListener;
 import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
@@ -29,15 +31,27 @@ import com.yaconfig.client.injector.AnchorType;
 import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
+import com.yaconfig.client.Constants;
 
+@WatchersType(from = Constants.fromMySQL)
 public class MySQLWatchers extends AbstractWatchers {
 	
 	MySQLWatchers myself;
 	HashMap<String,BinaryLogClient> connections = new HashMap<String,BinaryLogClient>();
 	HashMap<BinaryLogClient,ExecutorService> services = new HashMap<BinaryLogClient,ExecutorService>();
 	
-	public MySQLWatchers(Set<Field> fields, FieldChangeCallback callback) {
+	public MySQLWatchers(){
+		
+	}
+	
+	public MySQLWatchers(Reflections rfs, FieldChangeCallback callback){
+		this.init(rfs, callback);
+	}
+	
+	@Override
+	public Set<Field> init(Reflections rfs, FieldChangeCallback callback) {
 		myself = this;
+		Set<Field> fields = rfs.getFieldsAnnotatedWith(MySQLValue.class);
 		for(final Field field : fields){
 			MySQLValue annotation = field.getAnnotation(MySQLValue.class);
 			String tableName = annotation.tableName();
@@ -48,6 +62,8 @@ public class MySQLWatchers extends AbstractWatchers {
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + tableName + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
+		
+		return fields;
 	}
 
 	private void addConnection(final String connStr,final String tableName,String username,String password) {

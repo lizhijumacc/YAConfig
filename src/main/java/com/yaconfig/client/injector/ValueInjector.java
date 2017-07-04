@@ -64,11 +64,10 @@ import com.yaconfig.client.fetcher.ZookeeperFetcher;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.client.util.ConnStrKeyUtil;
 import com.yaconfig.client.util.FileUtil;
-import com.yaconfig.client.watchers.FileWatchers;
-import com.yaconfig.client.watchers.MySQLWatchers;
-import com.yaconfig.client.watchers.RedisWatchers;
-import com.yaconfig.client.watchers.RemoteWatchers;
-import com.yaconfig.client.watchers.ZookeeperWatchers;
+
+import com.yaconfig.client.watchers.Watchers;
+import com.yaconfig.client.watchers.WatchersType;
+
 
 import redis.clients.jedis.Jedis;
 
@@ -79,13 +78,8 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	private List<SoftReference<Object>> registry;
 	public ReferenceQueue<Object> queue;
 	private volatile static ValueInjector instance;
-	private RemoteWatchers remoteWatchers;
-	private FileWatchers fileWatchers;
-	private MySQLWatchers mySQLWatchers;
-	private RedisWatchers redisWatchers;
-	private ZookeeperWatchers zookeeperWatchers;
+	private List<Watchers> watchers;
 	
-	private Set<Field> fields;
 	private Map<Field,Set<Method>> beforeInjectMethods;
 	private Map<Field,Set<Method>> afterInjectMethods;
 	private Map<Field,Set<Method>> controlInjectMethods;
@@ -120,51 +114,28 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		this.beforeInjectMethods = new HashMap<Field,Set<Method>>();
 		this.afterInjectMethods = new HashMap<Field,Set<Method>>();
 		this.controlInjectMethods = new HashMap<Field,Set<Method>>();
+		this.watchers = new ArrayList<Watchers>();
+		this.initScan();
 	}
 	
+	private void initScan() {
+		Reflections reflections = getReflection(new String[]{""});
+		Set<Class<?>> clazzs = reflections.getTypesAnnotatedWith(WatchersType.class);
+		for(Class<?> c : clazzs){
+			try {
+				this.watchers.add((Watchers)c.newInstance());
+			} catch (InstantiationException | IllegalAccessException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public synchronized void scan(String[] packageList) {
 		Reflections reflections = getReflection(packageList);
-		
-		//remote values
-		fields = reflections.getFieldsAnnotatedWith(RemoteValue.class);
-		if(fields.size() != 0){
-			RemoteWatchers remoteWatchers = new RemoteWatchers(fields,this);
-			this.remoteWatchers = remoteWatchers;
-			registerFields(fields,reflections);
+		for(Watchers w : watchers){
+			Set<Field> fs = w.init(reflections, this);
+			registerFields(fs, reflections);
 		}
-		
-		//file values
-		fields = reflections.getFieldsAnnotatedWith(FileValue.class);
-		if(fields.size() != 0){
-			FileWatchers fileWatchers = new FileWatchers(fields,this);
-			this.fileWatchers = fileWatchers;
-			registerFields(fields,reflections);
-		}
-		
-		//zk values
-		fields = reflections.getFieldsAnnotatedWith(ZookeeperValue.class);
-		if(fields.size() != 0){
-			ZookeeperWatchers zookeeperWatchers = new ZookeeperWatchers(fields,this);
-			this.zookeeperWatchers = zookeeperWatchers;
-			registerFields(fields,reflections);
-		}
-		
-		//redis values
-		fields = reflections.getFieldsAnnotatedWith(RedisValue.class);
-		if(fields.size() != 0){
-			RedisWatchers redisWatchers = new RedisWatchers(fields,this);
-			this.redisWatchers = redisWatchers;
-			registerFields(fields,reflections);
-		}
-		
-		//mysql values
-		fields = reflections.getFieldsAnnotatedWith(MySQLValue.class);
-		if(fields.size() != 0){
-			MySQLWatchers mySQLWatchers = new MySQLWatchers(fields,this);
-			this.mySQLWatchers = mySQLWatchers;
-			registerFields(fields,reflections);
-		}
-		
 	}
 
     private void initSetValue(Field field) {

@@ -19,6 +19,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.reflections.Reflections;
+
 import com.yaconfig.client.annotation.Anchor;
 import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.injector.AnchorType;
@@ -26,15 +28,28 @@ import com.yaconfig.client.injector.DataFrom;
 import com.yaconfig.client.injector.FieldChangeCallback;
 import com.yaconfig.client.injector.FieldChangeListener;
 import com.yaconfig.client.util.ConnStrKeyUtil;
+import com.yaconfig.client.Constants;
 
+@WatchersType(from = Constants.fromFile)
 public class FileWatchers extends AbstractWatchers {
 	HashMap<Path,ExecutorService> pathSet;
 	HashMap<Path,Set<Watcher>> pathMapWatchers;
 	
-	public FileWatchers(Set<Field> fields, FieldChangeCallback callback){
+	public FileWatchers(){
 		pathSet = new HashMap<Path,ExecutorService>();
 		pathMapWatchers = new HashMap<Path,Set<Watcher>>();
-		
+	}
+	
+	public FileWatchers(Reflections refs, FieldChangeCallback callback){
+		this();
+		this.init(refs, callback);
+	}
+	
+	@Override
+	public Set<Field> init(Reflections refs, FieldChangeCallback callback){
+		pathSet = new HashMap<Path,ExecutorService>();
+		pathMapWatchers = new HashMap<Path,Set<Watcher>>();
+		Set<Field> fields = refs.getFieldsAnnotatedWith(FileValue.class);
 		for(Field field : fields){
 			FileValue fv = field.getAnnotation(FileValue.class);
 			if(fv != null){
@@ -47,6 +62,8 @@ public class FileWatchers extends AbstractWatchers {
 				}
 			}
 		}
+		
+		return fields;
 	}
 	
 	protected void notifyFileWatchers(String changedFile, Kind<?> kind) {

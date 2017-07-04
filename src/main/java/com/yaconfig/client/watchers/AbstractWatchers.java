@@ -1,9 +1,14 @@
 package com.yaconfig.client.watchers;
 
+import java.lang.reflect.Field;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.reflections.Reflections;
+
 import com.yaconfig.client.injector.DataFrom;
+import com.yaconfig.client.injector.FieldChangeCallback;
 
 public abstract class AbstractWatchers implements Watchers{
 	protected Map<String,Watcher> watchers;
@@ -48,6 +53,9 @@ public abstract class AbstractWatchers implements Watchers{
 	
 	@Override
 	public abstract void unwatch(String key,WatcherListener...listeners);
+	
+	@Override
+	public abstract Set<Field> init(Reflections rfs,FieldChangeCallback callback);
 	
 	public void notifyWatchers(String key,YAEventType event,DataFrom from){
 		for(Watcher w: watchers.values()){
