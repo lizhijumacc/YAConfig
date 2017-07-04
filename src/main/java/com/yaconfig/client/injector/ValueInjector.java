@@ -7,15 +7,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,10 +20,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.curator.RetryPolicy;
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.reflections.Reflections;
 import org.reflections.scanners.FieldAnnotationsScanner;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -44,34 +32,18 @@ import org.reflections.util.FilterBuilder;
 
 import com.google.common.base.Predicate;
 import com.yaconfig.client.Constants;
-import com.yaconfig.client.YAConfigConnection;
 import com.yaconfig.client.annotation.AfterChange;
 import com.yaconfig.client.annotation.Anchor;
 import com.yaconfig.client.annotation.BeforeChange;
 import com.yaconfig.client.annotation.ControlChange;
-import com.yaconfig.client.annotation.FileValue;
 import com.yaconfig.client.annotation.InitValueFrom;
-import com.yaconfig.client.annotation.MySQLValue;
-import com.yaconfig.client.annotation.RedisValue;
-import com.yaconfig.client.annotation.RemoteValue;
-import com.yaconfig.client.annotation.ZookeeperValue;
 import com.yaconfig.client.fetcher.FetchCallback;
 import com.yaconfig.client.fetcher.Fetcher;
 import com.yaconfig.client.fetcher.FetcherType;
-import com.yaconfig.client.fetcher.FileFetcher;
-import com.yaconfig.client.fetcher.MySQLFetcher;
-import com.yaconfig.client.fetcher.RedisFetcher;
-import com.yaconfig.client.fetcher.RemoteFetcher;
-import com.yaconfig.client.fetcher.ZookeeperFetcher;
-import com.yaconfig.client.message.YAMessage;
-import com.yaconfig.client.util.ConnStrKeyUtil;
-import com.yaconfig.client.util.FileUtil;
-
+import com.yaconfig.client.syncs.Sync;
+import com.yaconfig.client.syncs.SyncType;
 import com.yaconfig.client.watchers.Watchers;
 import com.yaconfig.client.watchers.WatchersType;
-
-
-import redis.clients.jedis.Jedis;
 
 public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	
@@ -82,6 +54,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	private volatile static ValueInjector instance;
 	private List<Watchers> watchers;
 	private List<Fetcher> fetchers;
+	private List<Sync> syncs;
 	
 	private Map<Field,Set<Method>> beforeInjectMethods;
 	private Map<Field,Set<Method>> afterInjectMethods;
@@ -119,6 +92,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		this.controlInjectMethods = new HashMap<Field,Set<Method>>();
 		this.watchers = new ArrayList<Watchers>();
 		this.fetchers = new ArrayList<Fetcher>(); 
+		this.syncs = new ArrayList<Sync>();
 		this.initScan();
 	}
 	
@@ -137,6 +111,15 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		for(Class<?> c : clazzs){
 			try {
 				this.fetchers.add((Fetcher)c.newInstance());
+			} catch (InstantiationException | IllegalAccessException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		clazzs = reflections.getTypesAnnotatedWith(SyncType.class);
+		for(Class<?> c : clazzs){
+			try {
+				this.syncs.add((Sync)c.newInstance());
 			} catch (InstantiationException | IllegalAccessException e) {
 				e.printStackTrace();
 			}
@@ -266,127 +249,16 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 
 	protected void syncValue(String data, Field field, int from) {
 		Anchor anchor = field.getAnnotation(Anchor.class);
-		if(anchor != null){
-			int anchorType = anchor.anchor();
-			final FileValue fv = field.getAnnotation(FileValue.class);
-			if(fv != null && anchorType == AnchorType.FILE && from == DataFrom.FILE){
-				try {
-					syncValue0(data,field,from);
-				} catch (IllegalArgumentException e) {
-					e.printStackTrace();
-				}
-			}
-			
-			final RemoteValue rv = field.getAnnotation(RemoteValue.class);
-			if(rv != null && anchorType == AnchorType.REMOTE && from == DataFrom.REMOTE){
-				try {
-					syncValue0(data,field,from);
-				} catch (IllegalArgumentException e) {
-					e.printStackTrace();
-				}
-			}
-			
-			final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
-			if(zv != null && anchorType == AnchorType.ZOOKEEPER && from == DataFrom.ZOOKEEPER){
-				try {
-					syncValue0(data,field,from);
-				} catch (IllegalArgumentException e) {
-					e.printStackTrace();
-				}
-			}
-			
-			final RedisValue rdv = field.getAnnotation(RedisValue.class);
-			if(rdv != null && anchorType == AnchorType.REDIS && from == DataFrom.REDIS){
-				try {
-					syncValue0(data,field,from);
-				} catch (IllegalArgumentException e) {
-					e.printStackTrace();
-				}
-			}
-			
-			final MySQLValue mv = field.getAnnotation(MySQLValue.class);
-			if(mv != null && anchorType == AnchorType.MYSQL && from == DataFrom.MYSQL){
-				try {
-					syncValue0(data,field,from);
-				} catch (IllegalArgumentException e) {
-					e.printStackTrace();
-				}
-			}
+		if(anchor != null && from == anchor.anchor()){
+			syncValue0(data,field,from);
 		}
 	}
 
 	private void syncValue0(String data, Field field, int from) {
-		final FileValue fv = field.getAnnotation(FileValue.class);
-		final RemoteValue rv = field.getAnnotation(RemoteValue.class);
-		final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
-		final RedisValue rdv = field.getAnnotation(RedisValue.class);
-		final MySQLValue mv = field.getAnnotation(MySQLValue.class);
-
-		if(fv != null && from != DataFrom.FILE){
-			FileUtil.writeValueToFile(ConnStrKeyUtil.makeLocation(fv.path(), fv.key()), data);
-		}
-		
-		if(rv != null && from != DataFrom.REMOTE){
-			YAConfigConnection connection = new YAConfigConnection();
-			connection.attach(rv.connStr());
-			connection.put(rv.key(), data.getBytes(), YAMessage.Type.PUT_NOPROMISE).awaitUninterruptibly();
-			connection.detach();
-		}
-		
-		if(rdv != null && from != DataFrom.REDIS){
-			Jedis jedis = null;
-			try {
-				jedis = new Jedis(new URI(rdv.connStr()), 15000);
-				jedis.connect();
-				jedis.set(rdv.key(), data);
-			} catch (URISyntaxException e) {
-				e.printStackTrace();
-			} finally {
-				if(jedis != null){
-					jedis.close();
-				}
-			}
-		}
-		
-		if(mv != null && from != DataFrom.MYSQL){
-			String keyName = mv.keyName();
-			String valueName = mv.valueName();
-			String key = mv.key();
-		    String username = mv.userName();
-		    String password = mv.password();
-			String tableName = mv.tableName();
-			String connStr = mv.connStr();
-			String sql = "update " + tableName + " set " + valueName + " = '" +
-							data + "' where " + keyName + " = '" + key + "'";
-
-		    Connection conn = null;
-		    try {
-		        conn = (Connection) DriverManager.getConnection(connStr, username, password);
-		        PreparedStatement pstmt = (PreparedStatement)conn.prepareStatement(sql);
-		        pstmt.execute();
-		    } catch (SQLException e) {
-		        e.printStackTrace();
-		    }finally{
-		    	try {
-					if(conn!=null)conn.close();
-				} catch (SQLException e) {
-					e.printStackTrace();
-				}
-		    }
-		}
-		
-		if(zv != null && from != DataFrom.ZOOKEEPER){
-			RetryPolicy policy = new ExponentialBackoffRetry(1000, 10);
-			CuratorFramework curator = CuratorFrameworkFactory.builder().connectString(zv.connStr())
-					.retryPolicy(policy).build();
-			try {
-				curator.start();
-				curator.createContainers(zv.key());
-				curator.setData().inBackground().forPath(zv.key(),data.getBytes());
-			} catch (Exception e) {
-				e.printStackTrace();
-			}finally{
-				curator.close();
+		for(Sync s : this.syncs){
+			SyncType st = s.getClass().getAnnotation(SyncType.class);
+			if(st.from() != from){
+				s.sync(data, field, from);
 			}
 		}
 	}
