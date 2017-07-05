@@ -1,5 +1,7 @@
 package com.yaconfig.test;
 
+import com.yaconfig.core.AnchorType;
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.AfterChange;
 import com.yaconfig.core.annotation.Anchor;
 import com.yaconfig.core.annotation.BeforeChange;
@@ -12,8 +14,6 @@ import com.yaconfig.core.annotation.RemoteValue;
 import com.yaconfig.core.annotation.SetValue;
 import com.yaconfig.core.annotation.Use;
 import com.yaconfig.core.annotation.ZookeeperValue;
-import com.yaconfig.core.injector.AnchorType;
-import com.yaconfig.core.injector.DataFrom;
 
 public class TestConfig{
 
@@ -23,34 +23,34 @@ public class TestConfig{
 	
 	private String value2;
 	
-	@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
+	//@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
 	private String remoteValue;
 	
-	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
+	//@FileValue(key = "connectStr", path = "D:\\test\\test.config")
 	private String fileValue;
 	
-	@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
+	//@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
 	private String redisValue;
 	
-	@MySQLValue(connStr = "jdbc:mysql://127.0.0.1:3306/world?useSSL=false&serverTimezone=UTC", tableName = "testConfig",
+	/*@MySQLValue(connStr = "jdbc:mysql://127.0.0.1:3306/world?useSSL=false&serverTimezone=UTC", tableName = "testConfig",
 			valueName = "testConfigValue", keyName = "testConfigName",
 			key = "connStr",
-			userName = "root", password = "jmdlbl88")
+			userName = "root", password = "jmdlbl88")*/
 	private String mysqlValue;
 	
-	@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
+	//@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
 	private String zookeeperValue;
 	
-	@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
+	//@RemoteValue(key = "com.test.0" ,connStr = "127.0.0.1:8888,127.0.0.1:8889,127.0.0.1:8890")
 	@FileValue(key = "connectStr", path = "D:\\test\\test.config")
 	@MySQLValue(connStr = "jdbc:mysql://127.0.0.1:3306/world?useSSL=false&serverTimezone=UTC", tableName = "testConfig",
 			valueName = "testConfigValue", keyName = "testConfigName",
 			key = "connStr",
 			userName = "root", password = "jmdlbl88")
-	@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
-	@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
-	@Anchor(anchor = AnchorType.FILE)
-	@InitValueFrom(from = DataFrom.FILE)
+	//@RedisValue(connStr = "redis://127.0.0.1:6379/0", key = "testConfig")
+	//@ZookeeperValue(connStr = "127.0.0.1:2181", key = "/testConfig1/test")
+	@Anchor(anchor = AnchorType.LATEST)
+	//@InitValueFrom(from = DataFrom.FILE)
 	private String value3;
 	
 	public TestConfig() {
@@ -59,27 +59,27 @@ public class TestConfig{
 	
 	@AfterChange(field = "remoteValue")
 	public void remoteChange(){
-		System.out.println("remoteValue change to:" + this.remoteValue);
+		//System.out.println("remoteValue change to:" + this.remoteValue);
 	}
 	
 	@AfterChange(field = "fileValue")
 	public void fileChange(){
-		System.out.println("fileValue change to:" + this.fileValue);
+		//System.out.println("fileValue change to:" + this.fileValue);
 	}
 	
 	@AfterChange(field = "redisValue")
 	public void redisChange(){
-		System.out.println("redisValue change to:" + this.redisValue);
+		//System.out.println("redisValue change to:" + this.redisValue);
 	}
 	
 	@AfterChange(field = "mysqlValue")
 	public void mysqlChange(){
-		System.out.println("mysqlValue change to:" + this.mysqlValue);
+		//System.out.println("mysqlValue change to:" + this.mysqlValue);
 	}
 	
 	@AfterChange(field = "zookeeperValue")
 	public void zookeeperChange(){
-		System.out.println("zookeeperValue change to:" + this.zookeeperValue);
+		//System.out.println("zookeeperValue change to:" + this.zookeeperValue);
 	}
 	
 	@BeforeChange(field = "value1")

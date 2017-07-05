@@ -4,8 +4,8 @@ import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.RedisValue;
-import com.yaconfig.core.injector.DataFrom;
 
 import redis.clients.jedis.Jedis;
 
@@ -13,7 +13,7 @@ import redis.clients.jedis.Jedis;
 public class RedisSync extends AbstractSync {
 
 	@Override
-	public void sync(String data,Field field,int from) {
+	public void sync(String data,Field field) {
 		final RedisValue rdv = field.getAnnotation(RedisValue.class);
 		if(rdv != null){
 			Jedis jedis = null;

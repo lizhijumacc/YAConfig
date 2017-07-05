@@ -1,4 +1,4 @@
-package com.yaconfig.core.injector;
+package com.yaconfig.core;
 
 import java.lang.annotation.Annotation;
 import java.lang.ref.ReferenceQueue;
@@ -31,17 +31,17 @@ import org.reflections.util.ConfigurationBuilder;
 import org.reflections.util.FilterBuilder;
 
 import com.google.common.base.Predicate;
-import com.yaconfig.core.Constants;
 import com.yaconfig.core.annotation.AfterChange;
 import com.yaconfig.core.annotation.Anchor;
 import com.yaconfig.core.annotation.BeforeChange;
 import com.yaconfig.core.annotation.ControlChange;
 import com.yaconfig.core.annotation.InitValueFrom;
-import com.yaconfig.core.fetcher.FetchCallback;
-import com.yaconfig.core.fetcher.Fetcher;
-import com.yaconfig.core.fetcher.FetcherType;
+import com.yaconfig.core.fetchers.FetchCallback;
+import com.yaconfig.core.fetchers.Fetcher;
+import com.yaconfig.core.fetchers.FetcherType;
 import com.yaconfig.core.syncs.Sync;
 import com.yaconfig.core.syncs.SyncType;
+import com.yaconfig.core.watchers.FieldChangeCallback;
 import com.yaconfig.core.watchers.Watchers;
 import com.yaconfig.core.watchers.WatchersType;
 
@@ -223,7 +223,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 			fetchAndInjectNewValue(field,from);
 		}else{
 			int type = anno.anchor();
-			if(from == type){
+			if(from == type || type == AnchorType.LATEST){
 				fetchAndInjectNewValue(field,from);
 			}
 		}
@@ -232,7 +232,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	@Override
 	public void onDelete(String key, Field field, int from) {
 		try {
-			injectValue(null,field);
+			injectAndSyncValue(null,field,from);
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
@@ -249,7 +249,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 
 	public void syncValue(String data, Field field, int from) {
 		Anchor anchor = field.getAnnotation(Anchor.class);
-		if(anchor != null && from == anchor.anchor()){
+		if(anchor != null && (from == anchor.anchor() || anchor.anchor() == AnchorType.LATEST)){
 			syncValue0(data,field,from);
 		}
 	}
@@ -258,7 +258,7 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		for(Sync s : this.syncs){
 			SyncType st = s.getClass().getAnnotation(SyncType.class);
 			if(st.from() != from){
-				s.sync(data, field, from);
+				s.sync(data, field);
 			}
 		}
 	}
@@ -274,22 +274,39 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 		}
 	}
 	
-	public void injectValue(String value,Field field) {
+	public void injectAndSyncValue(String newValue,Field field,int from) {
 		field.setAccessible(true);
+		final Class<?> clazz = field.getDeclaringClass();
+		
+		String oldValue = null;
+		synchronized(registry){
+			for(SoftReference<Object> config : registry){
+				Class<?> refClass = config.get().getClass().getSuperclass();
+				if(clazz.equals(refClass)){
+					try {
+						oldValue = (String)field.get(config.get());
+						if(oldValue != null && oldValue.equals(newValue)){
+							return;
+						}
+					} catch (IllegalArgumentException | IllegalAccessException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+		
 		if(Modifier.isStatic(field.getModifiers())){
 			try {
-				inject(field.getClass(),field,value);
+				inject(field.getClass(),field,newValue);
 			} catch (IllegalArgumentException e) {
 				e.printStackTrace();
 			}
 		} else {
-			final Class<?> clazz = field.getDeclaringClass();
-			
 			synchronized(registry){
 				for(SoftReference<Object> config : registry){
 					if(clazz.equals(config.get().getClass().getSuperclass())){
 						try {
-							inject(config.get(),field,value);
+							inject(config.get(),field,newValue);
 						} catch (IllegalArgumentException e) {
 							e.printStackTrace();
 						}
@@ -297,6 +314,8 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 				}
 			}
 		}
+		
+		syncValue(newValue,field,from);
 	}
 
 	private void inject(Object obj, Field field, Object newValue) {
@@ -362,12 +381,10 @@ public class ValueInjector implements FieldChangeCallback,FetchCallback {
 	@Override
 	public void dataFetched(String data, Field field, int from) {
 		try {
-			injectValue(data,field);
+			injectAndSyncValue(data,field,from);
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
-		
-		syncValue(data,field,from);
 	}
 }
 

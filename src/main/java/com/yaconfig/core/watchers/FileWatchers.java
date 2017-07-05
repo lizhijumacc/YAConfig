@@ -21,12 +21,9 @@ import java.util.concurrent.Executors;
 
 import org.reflections.Reflections;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.Anchor;
 import com.yaconfig.core.annotation.FileValue;
-import com.yaconfig.core.injector.AnchorType;
-import com.yaconfig.core.injector.DataFrom;
-import com.yaconfig.core.injector.FieldChangeCallback;
-import com.yaconfig.core.injector.FieldChangeListener;
 import com.yaconfig.core.util.ConnStrKeyUtil;
 
 @WatchersType(from = DataFrom.FILE)
@@ -56,7 +53,7 @@ public class FileWatchers extends AbstractWatchers {
 				String path = Paths.get(path_r).toAbsolutePath().toString();
 				String key = field.getAnnotation(FileValue.class).key();
 				Anchor anchor = field.getAnnotation(Anchor.class);
-				if(anchor == null || anchor != null && anchor.anchor() == AnchorType.FILE){
+				if(needWatch(anchor)){
 					watch(ConnStrKeyUtil.makeLocation(path, key), new FieldChangeListener(field,callback));
 				}
 			}
@@ -64,7 +61,7 @@ public class FileWatchers extends AbstractWatchers {
 		
 		return fields;
 	}
-	
+
 	protected void notifyFileWatchers(String changedFile, Kind<?> kind) {
 		Map<String,Watcher> watchers = findWatchers(changedFile);
         if(kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)){

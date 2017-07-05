@@ -7,14 +7,14 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.ZookeeperValue;
-import com.yaconfig.core.injector.DataFrom;
 
 @SyncType(from = DataFrom.ZOOKEEPER)
 public class ZookeeperSync extends AbstractSync {
 
 	@Override
-	public void sync(String data,Field field,int from) {
+	public void sync(String data,Field field) {
 		final ZookeeperValue zv = field.getAnnotation(ZookeeperValue.class);
 		if(zv != null){
 			RetryPolicy policy = new ExponentialBackoffRetry(1000, 10);

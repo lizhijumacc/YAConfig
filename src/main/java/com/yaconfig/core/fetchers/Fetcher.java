@@ -1,4 +1,4 @@
-package com.yaconfig.core.fetcher;
+package com.yaconfig.core.fetchers;
 
 import java.lang.reflect.Field;
 

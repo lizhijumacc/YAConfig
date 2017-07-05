@@ -6,7 +6,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import com.yaconfig.core.injector.AnchorType;
+import com.yaconfig.core.AnchorType;
 
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)

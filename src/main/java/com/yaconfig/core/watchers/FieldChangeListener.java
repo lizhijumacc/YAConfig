@@ -1,11 +1,6 @@
-package com.yaconfig.core.injector;
+package com.yaconfig.core.watchers;
 
 import java.lang.reflect.Field;
-import java.util.concurrent.ExecutionException;
-
-import com.yaconfig.client.message.YAMessage;
-import com.yaconfig.core.watchers.Watcher;
-import com.yaconfig.core.watchers.WatcherListener;
 
 public class FieldChangeListener implements WatcherListener{
 	

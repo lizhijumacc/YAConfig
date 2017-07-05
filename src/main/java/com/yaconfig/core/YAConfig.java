@@ -1,7 +1,5 @@
 package com.yaconfig.core;
 
-import com.yaconfig.core.injector.ValueInjector;
-
 public class YAConfig {
 	private ValueInjector injector = ValueInjector.getInstance();
 	

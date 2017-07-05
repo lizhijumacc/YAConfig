@@ -3,17 +3,9 @@ package com.yaconfig.core;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.core.annotation.Anchor;
-import com.yaconfig.core.annotation.FileValue;
-import com.yaconfig.core.annotation.RemoteValue;
 import com.yaconfig.core.annotation.SetValue;
 import com.yaconfig.core.annotation.Use;
-import com.yaconfig.core.injector.AnchorType;
-import com.yaconfig.core.injector.DataFrom;
-import com.yaconfig.core.injector.ValueInjector;
-import com.yaconfig.core.util.ConnStrKeyUtil;
-import com.yaconfig.core.util.FileUtil;
 
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
@@ -56,8 +48,7 @@ public class YAMethodInterceptor implements MethodInterceptor {
 			if(f != null){
 				Anchor anchor = f.getAnnotation(Anchor.class);
 				if(anchor != null && anchor.anchor() == AnchorType.MEMORY){
-					ValueInjector.getInstance().injectValue(newValue,f);
-					ValueInjector.getInstance().syncValue(newValue,f,AnchorType.MEMORY);
+					ValueInjector.getInstance().injectAndSyncValue(newValue, f, AnchorType.MEMORY);
 				}
 			}
 		}

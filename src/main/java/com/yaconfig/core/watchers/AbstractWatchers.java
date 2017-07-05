@@ -7,7 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.reflections.Reflections;
 
-import com.yaconfig.core.injector.FieldChangeCallback;
+import com.yaconfig.core.AnchorType;
+import com.yaconfig.core.annotation.Anchor;
 
 public abstract class AbstractWatchers implements Watchers{
 	protected Map<String,Watcher> watchers;
@@ -67,5 +68,11 @@ public abstract class AbstractWatchers implements Watchers{
 	
 	public Watcher getWatcher(String key){
 		return watchers.get(key);
+	}
+	
+	protected boolean needWatch(Anchor anchor) {
+		int myType = this.getClass().getAnnotation(WatchersType.class).from();
+		int anchorType = anchor.anchor();
+		return anchor == null || anchor != null && (anchorType == myType || anchorType == AnchorType.LATEST);
 	}
 }

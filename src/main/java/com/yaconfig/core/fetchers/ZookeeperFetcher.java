@@ -1,4 +1,4 @@
-package com.yaconfig.core.fetcher;
+package com.yaconfig.core.fetchers;
 
 import java.lang.reflect.Field;
 
@@ -7,8 +7,8 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.ZookeeperValue;
-import com.yaconfig.core.injector.DataFrom;
 
 @FetcherType(from = DataFrom.ZOOKEEPER)
 public class ZookeeperFetcher extends AbstractFetcher{

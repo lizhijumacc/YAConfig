@@ -25,12 +25,9 @@ import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import com.yaconfig.core.Constants;
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.Anchor;
 import com.yaconfig.core.annotation.MySQLValue;
-import com.yaconfig.core.injector.AnchorType;
-import com.yaconfig.core.injector.DataFrom;
-import com.yaconfig.core.injector.FieldChangeCallback;
-import com.yaconfig.core.injector.FieldChangeListener;
 
 @WatchersType(from = DataFrom.MYSQL)
 public class MySQLWatchers extends AbstractWatchers {
@@ -57,7 +54,7 @@ public class MySQLWatchers extends AbstractWatchers {
 			String key = annotation.key();
 			String connStr = annotation.connStr();
 			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor() == AnchorType.MYSQL){
+			if(needWatch(anchor)){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + tableName + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}

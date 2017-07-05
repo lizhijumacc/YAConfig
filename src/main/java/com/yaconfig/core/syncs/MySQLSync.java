@@ -6,14 +6,14 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.MySQLValue;
-import com.yaconfig.core.injector.DataFrom;
 
 @SyncType(from = DataFrom.MYSQL)
 public class MySQLSync extends AbstractSync {
 
 	@Override
-	public void sync(String data,Field field,int from) {
+	public void sync(String data,Field field) {
 		final MySQLValue mv = field.getAnnotation(MySQLValue.class);
 		if(mv != null){
 			String keyName = mv.keyName();

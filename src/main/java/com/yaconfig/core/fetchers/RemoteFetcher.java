@@ -1,4 +1,4 @@
-package com.yaconfig.core.fetcher;
+package com.yaconfig.core.fetchers;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
@@ -9,8 +9,8 @@ import com.yaconfig.client.future.AbstractFuture;
 import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.future.YAFutureListener;
 import com.yaconfig.client.message.YAMessage;
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.RemoteValue;
-import com.yaconfig.core.injector.DataFrom;
 
 @FetcherType(from = DataFrom.REMOTE)
 public class RemoteFetcher extends AbstractFetcher{

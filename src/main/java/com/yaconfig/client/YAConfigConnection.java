@@ -19,7 +19,7 @@ import com.yaconfig.client.message.YAMessageDecoder;
 import com.yaconfig.client.message.YAMessageEncoder;
 import com.yaconfig.client.message.YAMessageWrapper;
 import com.yaconfig.common.MessageProcessor;
-import com.yaconfig.core.injector.DataFrom;
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.util.ConnStrKeyUtil;
 import com.yaconfig.core.watchers.RemoteWatchers;
 import com.yaconfig.core.watchers.YAEventType;
@@ -171,7 +171,6 @@ public class YAConfigConnection extends MessageProcessor{
 		}else if(yamsg.getType() == YAMessage.Type.UPDATE && watchers != null){
 			watchers.notifyWatchers(watchKey,YAEventType.UPDATE,DataFrom.REMOTE);
 		}else if(yamsg.getType() == YAMessage.Type.ACK){
-			
 			YAFuture<YAEntry> f = futures.get(yamsg.getId());
 			if(f != null){
 				f.setSuccess(new YAEntry(yamsg.getKey(),yamsg.getValue()));

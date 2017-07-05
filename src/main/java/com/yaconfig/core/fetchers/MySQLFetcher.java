@@ -1,4 +1,4 @@
-package com.yaconfig.core.fetcher;
+package com.yaconfig.core.fetchers;
 
 import java.lang.reflect.Field;
 import java.sql.Connection;
@@ -7,8 +7,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.MySQLValue;
-import com.yaconfig.core.injector.DataFrom;
 
 @FetcherType(from = DataFrom.MYSQL)
 public class MySQLFetcher extends AbstractFetcher{

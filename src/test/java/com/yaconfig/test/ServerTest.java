@@ -138,12 +138,19 @@ public class ServerTest
     	config.scanPackage(ServerTest.class.getPackage().getName());
 		TestConfig conf = (TestConfig)ConfigFactory.getConfig(TestConfig.class);
 		
-		Thread.sleep(3000);
+		long begin = System.currentTimeMillis();
+		
+		for(int i = 0;i < 100; i++){
+			conf.setValue3("" + i);
+		}
+		
+		long end = System.currentTimeMillis();
+		
+		System.out.println("usetime:" + (end - begin));
 		
 		//conf.useValue3FromFile();
 		//Thread.sleep(3000);
 		//conf.useValue3FromRemote();
-		Thread.sleep(3000);
 		//conf.setValue3("fromMemory1111");
     	for(int i=0;i<0;i++){
     		//Thread.sleep(100);
@@ -184,7 +191,7 @@ public class ServerTest
     		}
     	}*/
     	
-		long begin = System.currentTimeMillis() / 1000;
+		
 
 		while(true){
 			try {

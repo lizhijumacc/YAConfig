@@ -1,11 +1,11 @@
-package com.yaconfig.core.fetcher;
+package com.yaconfig.core.fetchers;
 
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.RedisValue;
-import com.yaconfig.core.injector.DataFrom;
 
 import redis.clients.jedis.Jedis;
 

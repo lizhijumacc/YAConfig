@@ -1,10 +1,10 @@
-package com.yaconfig.core.fetcher;
+package com.yaconfig.core.fetchers;
 
 import java.lang.reflect.Field;
 import java.nio.file.Paths;
 
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.core.annotation.FileValue;
-import com.yaconfig.core.injector.DataFrom;
 import com.yaconfig.core.util.ConnStrKeyUtil;
 import com.yaconfig.core.util.FileUtil;
 

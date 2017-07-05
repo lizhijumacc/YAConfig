@@ -6,7 +6,9 @@ import java.util.Set;
 
 import org.reflections.Reflections;
 
+import com.yaconfig.core.AnchorType;
 import com.yaconfig.core.Constants;
+import com.yaconfig.core.DataFrom;
 import com.yaconfig.client.YAConfigConnection;
 import com.yaconfig.client.YAEntry;
 import com.yaconfig.client.future.AbstractFuture;
@@ -15,10 +17,6 @@ import com.yaconfig.client.future.YAFuture;
 import com.yaconfig.client.message.YAMessage;
 import com.yaconfig.core.annotation.Anchor;
 import com.yaconfig.core.annotation.RemoteValue;
-import com.yaconfig.core.injector.AnchorType;
-import com.yaconfig.core.injector.DataFrom;
-import com.yaconfig.core.injector.FieldChangeCallback;
-import com.yaconfig.core.injector.FieldChangeListener;
 import com.yaconfig.core.util.ConnStrKeyUtil;
 
 @WatchersType(from = DataFrom.REMOTE)
@@ -42,7 +40,7 @@ public class RemoteWatchers extends AbstractWatchers {
 			String key = annotation.key();
 			String connStr = annotation.connStr();
 			Anchor anchor = field.getAnnotation(Anchor.class);
-			if(anchor == null || anchor != null && anchor.anchor() == AnchorType.REMOTE){
+			if(needWatch(anchor)){
 				watch(connStr + Constants.CONNECTION_KEY_SEPERATOR + key,new FieldChangeListener(field,callback));
 			}
 		}
